@@ -1,25 +1,43 @@
 <template>
   <div id="app">
-    <div class="header">
-      <span class="title">人工智能平台</span>
-      <span class="header-middle">
-        <router-link to="/demo" tag="span" class="demo">示例</router-link>
-        <router-link to="/tutorial" tag="span" class="tutorial">教程</router-link>
-        <router-link to="/application" tag="span" class="app">应用</router-link>
-      </span>
-      <router-link to="/about" tag="span" class="about">关于</router-link>
-    </div>
+    <el-row class="header-large hidden-xs-only">
+      <div class="header-title">人工智能平台</div>
+
+      <div class="header-demo">示例</div>
+      <div class="header-tuto">教学</div>
+      <div class="header-appl">应用</div>
+      <div class="header-split">|</div>
+      <div class="header-split">|</div>
+      <div class="header-split">|</div>
+
+      <span class="header-about">关于</span>
+    </el-row>
+
+    <el-row class="header-small hidden-sm-and-up">
+      <div class="header-title">人工智能平台</div>
+      <el-menu
+        class="header-menu"
+        default-active="1"
+        mode="horizontal"
+        background-color="#fb5a52"
+        text-color="#fff"
+        active-text-color="#0000ff"
+        :router="true"
+        menu-trigger="click"
+      >
+        <el-submenu index="1" style="width:100%;">
+          <template slot="title">
+            <i class="el-icon-menu" style="color:#fff"></i>
+          </template>
+          <el-menu-item index="demo">示例</el-menu-item>
+          <el-menu-item index="tutorial">教学</el-menu-item>
+          <el-menu-item index="application">应用</el-menu-item>
+          <el-menu-item index="about">关于</el-menu-item>
+        </el-submenu>
+      </el-menu>
+    </el-row>
+
     <router-view/>
-
-    <div class="main-body">main body
-      <div class="left-canvas"></div>
-      <div class="right-body">
-        <div class="right-model"></div>
-        <div class="right-param"></div>
-      </div>
-    </div>
-
-    <div class="footer"></div>
   </div>
 </template>
 
@@ -28,51 +46,62 @@
 
 export default {
   name: "app",
-  components: {}
+  data() {
+    return {};
+  },
+  methods: {},
+  mounted() {},
+  components: {},
+  watch: {}
 };
 </script>
 
 <style lang="scss" scoped>
 #app {
-  position: absolute;
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  .header {
-    position: relative;
-    height: 100px;
+  .header-large {
     background-color: #fb5a52;
-    .title {
-      position: absolute;
-      color: #fff;
-      font-size: 36px;
-      bottom: 5px;
-      left: 5px;
+    height: 48px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    .header-title {
+      font-size: 28px;
+      line-height: 36px;
     }
-    .header-middle {
-      position: absolute;
-      bottom: 8px;
-      left: 300px;
-      width: 50%;
-      display: flex;
-      justify-content: space-between;
-      .demo,
-      .tutorial,
-      .app {
-        color: #fff;
-        font-size: 24px;
-        // line-height: 24px;
-      }
-    }
-    .about {
-      position: absolute;
-      bottom: 8px;
-      right: 15px;
-      color: #fff;
-      font-size: 20px;
-      // line-height: 20px;
+    .header-split {
+      color: #fb5a52;
     }
   }
+  .header-small {
+    background-color: #fb5a52;
+    height: 48px;
+    color: #fff;
+    display: flex;
+
+    .header-title {
+      flex: 10 1 auto;
+      font-size: 28px;
+      line-height: 48px;
+      text-align: center;
+    }
+    .header-menu {
+      flex: 1 1 auto;
+    }
+  }
+}
+</style>
+<style lang="css">
+/* 覆盖 elem 原始的数据，style不能用scoped，即必须设置全局样式。
+另外：加 !important */
+html body #app div ul li div.el-submenu__title {
+  height: 48px !important;
+  line-height: 48px !important;
+  border-bottom: none !important;
+  padding: 0px 0px !important;
+}
+html body #app div ul li div i.el-icon-menu {
+  margin-right: 0px !important;
 }
 </style>
