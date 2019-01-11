@@ -7,26 +7,26 @@
     <div class="large hidden-xs-only">
       <el-row type="flex" justify="space-around">
         <el-col :span="7">
-          <el-card class="card" shadow="hover">
+          <el-card class="card" shadow="always">
             示例
             
           </el-card>
         </el-col>
         <el-col :span="7">
-          <el-card class="card" shadow="hover">教学</el-card>
+          <el-card class="card" shadow="always">教学</el-card>
         </el-col>
         <el-col :span="7">
-          <el-card class="card" shadow="hover">应用</el-card>
+          <el-card class="card" shadow="always">应用</el-card>
         </el-col>
       </el-row>
     </div>
 
     <div class="small hidden-sm-and-up">
-      <el-card class="card" shadow="hover">示例</el-card>
+      <el-card class="card" shadow="always">示例</el-card>
 
-      <el-card class="card" shadow="hover">教学</el-card>
+      <el-card class="card" shadow="always">教学</el-card>
 
-      <el-card class="card" shadow="hover">应用</el-card>
+      <el-card class="card" shadow="always">应用</el-card>
     </div>
 
     <div class="footer">
