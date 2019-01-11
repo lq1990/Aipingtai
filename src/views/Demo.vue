@@ -8,27 +8,67 @@
         <div class>main-right</div>
       </el-col>
     </el-row>
-    <p>
+    <p style="text-align:center;">
       展示游乐场
       左侧：画布
       右侧上：模型选择
       右侧下：模型参数
       右侧底：训练 按钮
     </p>
-    <canvas id="cs" width="600" height="600">
-      友情提示：此处是画布。为了更好地体验，请升级您的浏览器。
-    </canvas>
+
+    <div class="div-cs">
+      <canvas class="cs" :width="width" :height="height"></canvas>
+    </div>
+
+    <input type="button" value="clear" @click="clickBtn">
   </div>
 </template>
 
 <script>
+// 考虑到宽高在不同设备，以及横放、纵放时会不同。这里取宽高较小的。
+const iWidth = (window.innerWidth / 3) * 2;
+const iHeight = (window.innerHeight / 3) * 2;
+const width = Math.min(iWidth, iHeight);
+const height = width;
+console.log("width:", width);
+
+import Konva from "konva";
 export default {
   name: "demo",
   data() {
-    return {};
-  }
+    return {
+      width,
+      height
+    };
+  },
+  methods: {
+    clickBtn(e) {
+      console.log("button", e);
+
+      // rect.clearRect(0, 0, this.width, this.height);
+
+      // stage.clearRect(0, 0, this.width, this.height);
+    }
+  },
+  created() {},
+  mounted() {}
 };
 </script>
 
 <style lang="scss" scoped>
+.demo {
+  .div-cs {
+    .cs {
+      border: 1px solid #000;
+      margin: 0 auto;
+    }
+  }
+}
+</style>
+
+<style lang="css">
+div.konvajs-content {
+  border: 1px solid #000 !important;
+  margin: 0 auto !important;
+}
 </style>

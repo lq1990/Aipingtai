@@ -33,7 +33,7 @@
         mode="horizontal"
         background-color="#fb5a52"
         text-color="#fff"
-        active-text-color="#000"
+        active-text-color="#fff"
         :router="true"
         menu-trigger="click"
       >
