@@ -32,7 +32,7 @@ const width = Math.min(iWidth, iHeight);
 const height = width;
 console.log("width:", width);
 
-import Konva from "konva";
+// import Konva from "konva";
 export default {
   name: "demo",
   data() {
