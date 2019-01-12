@@ -11,7 +11,7 @@
         :router="true"
         menu-trigger="click"
       >
-        <el-menu-item index="/" class="header-title">人工智能平台</el-menu-item>
+        <el-menu-item index="/" class="header-title">平台</el-menu-item>
         <el-menu-item index="/demo">示例</el-menu-item>
         <el-menu-item index="tutorial">教学</el-menu-item>
         <el-menu-item index="application">应用</el-menu-item>
@@ -25,7 +25,7 @@
     </el-row>
 
     <el-row class="header-small hidden-sm-and-up">
-      <router-link to="/" tag="div" class="header-title">人工智能平台</router-link>
+      <router-link to="/" tag="div" class="header-title">平台</router-link>
 
       <el-menu
         class="header-menu"
