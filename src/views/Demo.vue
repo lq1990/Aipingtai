@@ -19,12 +19,55 @@
     <div id="container"></div>
 
     <div class="btn-wrap">
-      
-      <input type="button" value="addPoint" @click="statusAdd = true">
-      <input type="button" value="removePoint" @click="statusAdd = false">
-      <input type="button" value="clearAll" @click="handleClearAll">
-      <input type="button" value="runML">
-      
+      <!-- PC、移动端区别对待点击事件。
+      PC: click (== tap of Mobile),
+      Mobile: touchstart (==mousedown of PC) -->
+      <div class="btn-point">
+        <input
+          type="button"
+          value="添加一点"
+          @click="statusAdd = true"
+          @touchstart="statusAdd = true"
+          :class="{showBtnBorder: statusAdd}"
+        >
+        <input
+          type="button"
+          value="移除某点"
+          @click="statusAdd = false"
+          @touchstart="statusAdd = false"
+          :class="{showBtnBorder: !statusAdd}"
+        >
+        <input type="button" value="清空所有" @click="handleClearAll" @touchstart="handleClearAll">
+        <input type="button" value="运行">
+      </div>
+      <div class="btn-add-del-color-type">
+        <input type="button" @click="addColorType" @touchstart="addColorType" value="添加点类型">
+        <input type="button" @click="delColorType" @touchstart="delColorType" value="删除点类型">
+      </div>
+
+      <div class="color-type">
+        <!-- 此处实现点击添加点类型按钮来 动态往页面添加元素 -->
+        <div
+          v-for="(item, index) in colorTypeArr"
+          :key="index"
+          :style="{backgroundColor: colorTypeStore[index], 
+            width: '25px', 
+            height: '25px',
+            cursor: 'pointer',
+            borderWidth: showWidthStore[index],
+            borderStyle: 'solid',
+            borderColor: colorTypeStore[index]
+            }"
+          @click="changeColorType(index)"
+        >
+          <!-- <div :class="colorTypeArr[index]"></div> -->
+          <!-- <input v-model="colorTypeArr[index]" 
+          :style="{backgroundColor: colorTypeStore[index]}">-->
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: center; margin-top: 10px;">
+      <input type="button" value="allDataInfo" @click="showAllDataInfo">
     </div>
   </div>
 </template>
@@ -37,8 +80,8 @@ const width = Math.min(iWidth, iHeight);
 const height = width;
 console.log("width:", width);
 console.log("height:", height);
+// 画布上的每个点所包含的的信息：坐标，样式
 import Konva from "konva";
-
 export default {
   name: "demo",
   data() {
@@ -46,14 +89,71 @@ export default {
       width: width,
       height: height,
       statusAdd: true, // 点增加、移除
-      pointType: {}, // 记录10种点类型(颜色、点形状)。为 后续 ML分为10类做准备
-      listPoints: [],
-      pointRadius: 3,
+      currentColor: "#fb5a52",
+      showWidthStore: [
+        "2px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ], // 10中颜色，被点击的颜色即当前用的颜色会有边框
+      colorTypeStore: [
+        "#fb5a52",
+        "#32b900",
+        "#ffcc00",
+        "#0003a2",
+        "#b900b3",
+        "#cc5067",
+        "#c0e700",
+        "#1adccc",
+        "#a48176",
+        "#313e41"
+      ], // 10种颜色
+      // listPoints: [], // 存储点击的 点位置和点类别(不同类别对应颜色、样式不同)信息 [[x,y],[x,y],...]// 记录10种点类型(颜色、点形状)。为 后续 ML分为10类做准备
+      listPointsPosType: [], // [{pos:[x,1], color: ""}, {},...]
+      pointRadius: 3, // 点击时，画布上圆半径
       layer: null,
-      stage: null
+      stage: null,
+      colorTypeArr: [0] // 此为协助colorTypeStore用的数组
     };
   },
   methods: {
+    showAllDataInfo() {
+      console.log("所有点数据: ", this.listPointsPosType);
+    },
+    changeColorType(index) {
+      this.currentColor = this.colorTypeStore[index];
+      this.drawStageBorder();
+      this.showWidthStore = [
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ];
+      this.showWidthStore[index] = "2px";
+    },
+    addColorType() {
+      if (this.colorTypeArr.length < 10) {
+        this.colorTypeArr.push(1);
+      }
+      // console.log(this.colorTypeArr);
+    },
+    delColorType(index) {
+      if (this.colorTypeArr.length >= 2) {
+        this.colorTypeArr.splice(index, 1);
+      }
+    },
     /**
      * 使用rect画白色矩形来清空舞台、层。
      * @param {Konva.Stage} stage
@@ -65,7 +165,8 @@ export default {
         y: 0,
         width: stage.width(),
         height: stage.height(),
-        fill: "white"
+        fill: "white",
+        stroke: this.currentColor
       });
       layer.add(rect);
       layer.draw();
@@ -74,19 +175,33 @@ export default {
      * 在 layer 上画出 listPoints 存储的点。
      * listPoints 内部数据格式为 [[x1,y1],[x2,y2],...]
      */
-    drawPoints(layer, listPoints) {
+    // drawPoints(layer, listPoints, color) {
+    //   var circle;
+    //   listPoints.forEach(item => {
+    //     circle = new Konva.Circle({
+    //       x: item[0],
+    //       y: item[1],
+    //       radius: this.pointRadius,
+    //       fill: color
+    //     });
+    //     circle.cache();
+    //     layer.add(circle);
+    //   });
+
+    //   layer.draw();
+    // },
+    drawPointsFromList(layer, listPointsPosType) {
       var circle;
-      listPoints.forEach(item => {
+      listPointsPosType.forEach(item => {
         circle = new Konva.Circle({
-          x: item[0],
-          y: item[1],
+          x: item.pos[0],
+          y: item.pos[1],
           radius: this.pointRadius,
-          fill: "black"
+          fill: item.color
         });
         circle.cache();
         layer.add(circle);
       });
-
       layer.draw();
     },
     /**
@@ -95,10 +210,121 @@ export default {
      * 2. 清空舞台
      */
     handleClearAll() {
-      console.log("this.listPoints:", this.listPoints);
-      this.listPoints = [];
-      console.log("this.listPoints:", this.listPoints);
+      // console.log("this.listPoints:", this.listPoints);
+      // this.listPoints = [];
+      this.listPointsPosType = [];
+      // console.log("this.listPoints:", this.listPoints);
       this.clearStage(this.stage, this.layer);
+    },
+    /**
+     * 10种颜色对应10类
+     */
+    typeOfColor(color) {
+      switch (color) {
+        case this.colorTypeStore[0]:
+          return "A";
+        case this.colorTypeStore[1]:
+          return "B";
+        case this.colorTypeStore[2]:
+          return "C";
+        case this.colorTypeStore[3]:
+          return "D";
+        case this.colorTypeStore[4]:
+          return "E";
+        case this.colorTypeStore[5]:
+          return "F";
+        case this.colorTypeStore[6]:
+          return "G";
+        case this.colorTypeStore[7]:
+          return "H";
+        case this.colorTypeStore[8]:
+          return "I";
+        case this.colorTypeStore[9]:
+          return "J";
+
+        default:
+          return "";
+      }
+    },
+    /**
+     * PC、移动端的 点击移除点事件 区别对待
+     * 1. PC端mouse可以准确点击，所以 removePoint时设定的扫描区域较小
+     * 2. 移动端，touch事件有偏差，所以 removeDisThreshold 调大
+     */
+    stageOnEvent(event, removeDisThreshold) {
+      this.stage.on(event, () => {
+        const Pos = this.stage.getPointerPosition();
+        const x = Math.round(Pos.x);
+        const y = Math.round(Pos.y);
+        console.log(x, y);
+
+        if (this.statusAdd) {
+          // this.listPoints.push([x, y]);
+          // console.log("color: " + this.currentColor);
+
+          var type = this.typeOfColor(this.currentColor);
+          this.listPointsPosType.push({
+            pos: [x, y],
+            color: this.currentColor,
+            type: type
+          });
+          // console.log(
+          //   "%clistPointsPosType: ",
+          //   "color:red",
+          //   this.listPointsPosType
+          // );
+        } else {
+          // 在移除状态时，点击位置附近较近的一个点会被移除
+
+          /*
+          this.listPoints.forEach((item, index) => {
+            var distance = Math.sqrt((item[0] - x) ** 2 + (item[1] - y) ** 2);
+            if (distance < removeDisThreshold) {
+              this.listPoints.splice(index, 1);
+            }
+          });
+          */
+          this.listPointsPosType.forEach((item, index) => {
+            var distance = Math.sqrt(
+              (item.pos[0] - x) ** 2 + (item.pos[1] - y) ** 2
+            );
+            if (distance < removeDisThreshold) {
+              this.listPointsPosType.splice(index, 1);
+            }
+          });
+        }
+        // console.log(this.listPoints);
+
+        // 画之前清空画布
+        this.clearStage(this.stage, this.layer);
+
+        // this.drawPoints(this.layer, this.listPoints, this.currentColor);
+        this.drawPointsFromList(this.layer, this.listPointsPosType);
+        this.drawStageBorder();
+      });
+    },
+    /**
+     * 画舞台边框。改变画笔颜色时，边框会变成相应颜色。以提示用户
+     */
+    drawStageBorder() {
+      var before_draw = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: this.width,
+        height: this.height,
+        stroke: "#fff",
+        strokeWidth: 5
+      });
+      var stage_border = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: this.width,
+        height: this.height,
+        stroke: this.currentColor
+      });
+
+      this.layer.add(before_draw, stage_border);
+      this.layer.draw();
     },
     /**
      * 新建canvas
@@ -115,44 +341,19 @@ export default {
       this.layer = new Konva.Layer();
       this.stage.add(this.layer);
 
+      // canvas边框给颜色，currentColor，这样在画点时就知道那个颜色在用了
+      this.drawStageBorder();
       // 在整个stage即canvas画布 上绑定点击事件
       // 点击事件触发后就会执行
-      this.stage.on("mousedown touchstart", () => {
-        // 用匿名函数可以实现用this指向data中的值。
-        // 若有function(){} 则this指向 Konva.stage
-        const Pos = this.stage.getPointerPosition();
-        const x = Math.round(Pos.x);
-        const y = Math.round(Pos.y);
-        console.log(x, y);
+      this.stageOnEvent("mousedown", this.pointRadius);
+      this.stageOnEvent("touchstart", this.pointRadius * 2);
 
-        if (this.statusAdd) {
-          this.listPoints.push([x, y]);
-        } else {
-          // 在移除状态时，点击位置附近较近的一个点会被移除
-          this.listPoints.forEach((item, index) => {
-            var distance = Math.sqrt((item[0] - x) ** 2 + (item[1] - y) ** 2);
-            if (distance < this.pointRadius) {
-              this.listPoints.splice(index, 1);
-            }
-          });
-        }
-        console.log(this.listPoints);
-
-        // 画之前清空画布
-        this.clearStage(this.stage, this.layer);
-
-        this.drawPoints(this.layer, this.listPoints);
-
-        // 需要将点击的位置记录下来。
-        // 否则当跳到别的页面时，就会丢失了。
-        // 另外，记录下来，再使用ML算法
-        // 尝试放在 localStorage or sessionStorage， 或vuex
+      /* 函数式编程，当第二个参数用function而非匿名函数时，this指向会有不同
+      this.stage.on("mousemove", function() {
+        console.log("mousemove");
+        console.log(this); // this指向 Konva.Stage
       });
-
-      // this.stage.on("mousemove", function() {
-      //   console.log("mousemove");
-      //   console.log(this); // this指向 Konva.Stage
-      // });
+      */
     }
   },
   created() {},
@@ -165,11 +366,32 @@ export default {
 <style lang="scss" scoped>
 .demo {
   .btn-wrap {
-    margin-top: 10px;
-    display: flex;
-    justify-content: center;
-    input {
-      margin: 0 5px;
+    .btn-point {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      input {
+        margin: 0 5px;
+      }
+      .showBtnBorder {
+        border: 1.5px solid #333;
+      }
+    }
+    .btn-add-del-color-type {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      input {
+        margin: 0 5px;
+      }
+    }
+    .color-type {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      div {
+        margin: 0 5px;
+      }
     }
   }
 }
@@ -177,7 +399,7 @@ export default {
 
 <style lang="css">
 div.konvajs-content {
-  border: 1px solid #000 !important;
+  /* border: 1px solid #000 !important; */
   margin: 0 auto !important;
 }
 </style>
