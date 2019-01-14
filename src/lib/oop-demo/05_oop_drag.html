@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>OOP: drag</title>
+    <style>
+      #div1 {
+        width: 100px;
+        height: 100px;
+        background-color: #ff9645;
+        position: absolute;
+        color: white;
+        text-align: center;
+        line-height: 100px;
+      }
+
+      #div2 {
+        top: 200px;
+        width: 100px;
+        height: 100px;
+        background-color: #f66;
+        position: absolute;
+        color: white;
+        text-align: center;
+        line-height: 100px;
+      }
+    </style>
+    <script src="./Drag.js"></script>
+    <script src="./LimitDrag.js"></script>
+    <script>
+      window.onload = function() {
+        new Drag('div1');
+        new LimitDrag('div2');
+      };
+
+      
+    //   function fnDown(ev) {
+    //     var oEvent = ev || event;
+
+    //     disX = oEvent.clientX - oDiv.offsetLeft;
+    //     disY = oEvent.clientY - oDiv.offsetTop;
+
+    //     document.onmousemove = fnMove;
+
+    //     document.onmouseup = fnUp;
+    //   }
+
+    //   function fnMove(ev) {
+    //     var oEvent = ev || event;
+    //     oDiv.style.left = oEvent.clientX - disX + 'px';
+    //     oDiv.style.top = oEvent.clientY - disY + 'px';
+    //   }
+
+    //   function fnUp() {
+    //     document.onmousemove = null;
+    //     document.onmouseup = null;
+    //   }
+
+    </script>
+  </head>
+  <body>
+    <div id="div1">normal drag</div>
+    <div id="div2">limited drag</div>
+  </body>
+</html>

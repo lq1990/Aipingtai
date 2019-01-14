@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>OOP advanced</title>
+    <style></style>
+    <script>
+      var json = {
+        a: 12,
+        b: 5,
+        c: 'abc',
+        show: function() {
+          alert(this.a); // this => json, show属于谁，谁就是this指代的
+        }
+      };
+    //   alert(json.a);
+    json.show();
+    
+    
+    
+    
+    
+    // json适用于: 单体
+    </script>
+  </head>
+  <body></body>
+</html>
