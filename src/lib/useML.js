@@ -1,51 +1,27 @@
-const math = require("mathjs");
-// 将data进行 二分类，使用逻辑回归
+// require("./LogReg"); 进来的是一个json对象，而不是直接的 LogReg
+// es5 语法
+const LR = require("./ML").LogReg;
 
-var X = [
-  [1, 1, 2],
-  [1, 2, 3],
-  [1, 4, 2],
-  [1, 100, 100],
-  [1, 88, 88],
-  [1, 99, 99]
-]; // (6,2)
-var Y = [[0], [0], [0], [1], [1], [1]];
-var W = math.ones(3, 1);
-console.log("W:", W);
+var inp = [
+  { pos: [1, 2], type: "A", color: "" },
+  { pos: [2, 3], type: "A", color: "" },
+  { pos: [4, 2], type: "A", color: "" },
+  { pos: [20, 40], type: "A", color: "" },
+  { pos: [40, 20], type: "A", color: "" },
+  { pos: [100, 60], type: "B", color: "" },
+  { pos: [88, 88], type: "B", color: "" },
+  { pos: [99, 99], type: "B", color: "" },
+  { pos: [70, 70], type: "B", color: "" },
+  { pos: [60, 100], type: "B", color: "" }
+];
 
-var matX = math.matrix(X);
-var matX_T = math.transpose(matX);
+var res = new LR(inp).getResult();
+console.log("res:", res);
 
-for (var i = 0; i < 1; i++) {
-  var Z = math.multiply(matX, W); // (6,1)
+// ========================  改进 =================
+// 为了应对不同的场景，
+// LogReg的输入inp不针对于 canvas数据，
+// 而是 直接是 X 和 label
+// 这样在使用 新的 LogReg之前，要先把canvas过来的数据转换
 
-  // console.log("Z:", Z);
-  // console.log(math.dotDivide(1, Z));
-  // console.log(math.add(Z, 1));
-  // console.log(math.multiply(Z, -1));
-  // console.log("dotPow(Z,2): ", math.dotPow(Z, 2));
-
-  var H = sigmoid(Z);
-  // console.log("H:", H);
-
-  var matY = math.matrix(Y);
-  var HminusY = math.subtract(H, matY);
-  // console.log("matY:", matY);
-  // console.log("HminusY:", HminusY);
-
-  var dCdW = math.multiply(matX_T, HminusY);
-  // console.log("dCdW: ", dCdW);
-
-  // W = W - math.multiply(0.01, dCdW)
-  W = math.subtract(W, math.multiply(0.01, dCdW));
-  console.log("W: " + W + ", i: " + i + "============================");
-}
-
-function sigmoid(inp) {
-  //   var out = 1 / (1 + Math.E ** -inp);
-  var num = 1;
-  var expMinusZ = math.dotPow(Math.E, math.multiply(-1, inp));
-  var den = math.add(1, expMinusZ); // 加减可以直接进行 elementwise。但乘除必须用dot。
-  var out = math.dotDivide(num, den);
-  return out;
-}
+// 当然针对canvas的数据转换 所用到的api，也可以在js文件中提前写好

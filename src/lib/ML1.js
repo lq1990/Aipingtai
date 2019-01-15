@@ -2,64 +2,7 @@ const math = require("mathjs");
 
 function ML() {}
 
-ML.prototype.logReg = function(X, Y, stepSize, stepTotal, isLogW) {
-  this.stepSize = stepSize || 0.01;
-  this.stepTotal = stepTotal || 1001;
-  this.isLogW = isLogW || false;
-  // 初始化
-  var W = math.ones(1 + X.size()[1], 1); // 针对逻辑回归二分类问题
-  var XT = math.transpose(X);
-  this.logWval = [W.valueOf()]; // 记录W的变化
-  // 迭代优化求W
-  for (var i = 0; i < this.stepTotal; i++) {
-    var Z = math.multiply(X, W); // Z = XW
-    var H = this.sigmoid(Z);
-    var HminusY = math.subtract(H, Y);
-    var dCdW = math.multiply(XT, HminusY);
-    W = math.subtract(W, math.multiply(this.stepSize, dCdW));
-    if (this.isLogW) {
-      // 记录每一步
-      this.logWval.push(W.valueOf());
-    }
-  }
-  this.optWval = W.valueOf();
-};
-
-ML.prototype.labelOfType = function(type) {
-  switch (type) {
-    case "A":
-      return [0];
-    case "B":
-      return [1];
-    case "C":
-      return [2];
-    case "D":
-      return [3];
-    case "E":
-      return [4];
-    case "F":
-      return [5];
-    case "G":
-      return [6];
-    case "H":
-      return [7];
-    case "I":
-      return [8];
-    case "J":
-      return [9];
-    default:
-      return null;
-  }
-};
-
-/**
- * 输入：canvas过来的数据，格式：[{pos:[x,1],type:"",color:""}, {},...]
- *
- * 输出：给ML模型用的matrix格式。
- * 1. 输出X：Features, [[1,x,y],[1,x,y],...]
- * 2. 输出Y: Labels, [[0],[1],...]
- */
-ML.prototype.canvas2MLmat = function(canvasData) {
+ML.prototype.canvas2MLData = function(canvasData) {
   // canvasData: 从canvas过来的数据格式：
   // [
   // { pos: [x, y], type: "A", color: "" },
@@ -76,7 +19,7 @@ ML.prototype.canvas2MLmat = function(canvasData) {
     var pos = item.pos;
     var type = item.type;
     X0.push(pos);
-    Y0.push(this.labelOfType(type));
+    Y0.push(this.label01OfTypeAB(type));
   });
   var X = math.concat(math.ones(X0.length, 1), X0);
   var Y = math.matrix(Y0);
@@ -221,6 +164,5 @@ LogReg.prototype.sigmoid = function(inpZ) {
 // es5写法：导出一个模块对象。 是一个json对象。
 // 在其他文件使用时，也是import进了json对象
 module.exports = {
-  ML: ML,
   LogReg: LogReg
 };
