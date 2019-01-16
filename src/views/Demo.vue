@@ -38,7 +38,7 @@
           :class="{showBtnBorder: !statusAdd}"
         >
         <input type="button" value="清空所有" @click="handleClearAll" @touchstart="handleClearAll">
-        <input type="button" value="运行">
+        <input type="button" value="运行" @click="handleRun">
       </div>
       <div class="btn-add-del-color-type">
         <input type="button" @click="addColorType" @touchstart="addColorType" value="添加点类型">
@@ -60,9 +60,7 @@
             }"
           @click="changeColorType(index)"
         >
-          <!-- <div :class="colorTypeArr[index]"></div> -->
-          <!-- <input v-model="colorTypeArr[index]" 
-          :style="{backgroundColor: colorTypeStore[index]}">-->
+        
         </div>
       </div>
     </div>
@@ -82,6 +80,8 @@ console.log("width:", width);
 console.log("height:", height);
 // 画布上的每个点所包含的的信息：坐标，样式
 import Konva from "konva";
+import ML from "../lib/ML.js";
+console.log("ML:", ML);
 export default {
   name: "demo",
   data() {
@@ -115,7 +115,8 @@ export default {
         "#313e41"
       ], // 10种颜色
       // listPoints: [], // 存储点击的 点位置和点类别(不同类别对应颜色、样式不同)信息 [[x,y],[x,y],...]// 记录10种点类型(颜色、点形状)。为 后续 ML分为10类做准备
-      listPointsPosType: [], // [{pos:[x,1], color: ""}, {},...]
+      listPointsPosType: [], // 存储了点的信息 [{pos:[x,1], color: ""}, {},...]
+      // 有了点的信息 ，可以进一步用ML做分类、回归、聚类
       pointRadius: 3, // 点击时，画布上圆半径
       layer: null,
       stage: null,
@@ -123,6 +124,33 @@ export default {
     };
   },
   methods: {
+    handleRun() {
+      this.LogRegDrawBoundary();
+    },
+    LogRegDrawBoundary() {
+      var common = new ML.Common();
+      var { X, Y } = common.canvas2MLmat(this.listPointsPosType);
+      var LR = new ML.LogReg(X, Y, 0.001, 10000);
+      var optWval = LR.getOptWval();
+      var Wdetails = LR.getWdetails(optWval);
+      console.log(Wdetails);
+      var coefficientOfX1 = Wdetails.coefficientOfX1;
+      var yIn = Wdetails.x2Intercept;
+      this.drawLineFromIntercept(this.layer, coefficientOfX1, yIn);
+    },
+    drawLineFromIntercept(layer, coefficientOfX1, yIn) {
+      // x2 = coefficientOfX1 * x1 + yIn
+      var x2Whenx1Is0 = coefficientOfX1 * 0 + yIn;
+      var x2Whenx1IsBorder = coefficientOfX1 * this.width + yIn;
+      var line = new Konva.Line({
+        points: [0, x2Whenx1Is0, this.width, x2Whenx1IsBorder],
+        stroke: "#313e41",
+        strokeWidth: 2
+      });
+
+      layer.add(line);
+      layer.draw();
+    },
     showAllDataInfo() {
       console.log("所有点数据: ", this.listPointsPosType);
     },
@@ -147,13 +175,13 @@ export default {
       if (this.colorTypeArr.length < 10) {
         this.colorTypeArr.push(1);
       }
-      // console.log(this.colorTypeArr);
     },
     delColorType(index) {
       if (this.colorTypeArr.length >= 2) {
         this.colorTypeArr.splice(index, 1);
       }
     },
+
     /**
      * 使用rect画白色矩形来清空舞台、层。
      * @param {Konva.Stage} stage
@@ -247,6 +275,8 @@ export default {
       }
     },
     /**
+     * 点击事件发生时，将点存储、删除、清空。
+     *
      * PC、移动端的 点击移除点事件 区别对待
      * 1. PC端mouse可以准确点击，所以 removePoint时设定的扫描区域较小
      * 2. 移动端，touch事件有偏差，所以 removeDisThreshold 调大

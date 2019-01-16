@@ -32,7 +32,7 @@ Common.prototype.extendArr = function(inp, dir, num) {
  * 自己写的，按照列方向求标准差。
  * @param {*} inp math.matrix 格式，多行多列
  * @param {*} dir 0: 列方向
- * @returns math vector 当为列方向时，输出为 一行的向量 [a,b,...]
+ * @returns 当为列方向时，输出为 一行的向量 [a,b,...]
  */
 Common.prototype.myStd = function(inp, dir) {
   var direc = dir || 0;
@@ -51,11 +51,6 @@ Common.prototype.myStd = function(inp, dir) {
   }
 };
 
-/**
- * 在scaling的两种方法中，都有分母为0的风险；
- * 若矩阵的某一列的数据完全相等时，会出现此风险。
- * 此时，把这一列的值改为1.
- */
 Common.prototype.handleDenIs0InScaling = function(out, range) {
   // 找到range为0的那一列， 当range为0时，意味着这一行的值都是一样的，此种情况下这一行的数都被赋值为1
   var idx = null;
@@ -106,9 +101,12 @@ Common.prototype.scaling = function(inp, scaleType) {
     var maxArr = this.extendArr(maxValNew, 0, inp.size()[0]);
     var inpMinusMinArr = math.subtract(inp, minArr);
     var range = math.subtract(maxArr, minArr);
+    // console.log("range: ", range);
 
     out = math.dotDivide(inpMinusMinArr, range);
+
     out = this.handleDenIs0InScaling(out, range);
+
     return out;
   } else {
     var meanVal = math.mean(inp, 0); // 格式为：math的vector，并非一行多列
@@ -287,9 +285,9 @@ LogReg.prototype.getWdetails = function(aWval) {
 // ========================================================================
 // es5写法：导出一个模块对象。 是一个json对象。
 // 在其他文件使用时，也是import进了json对象
-// module.exports = {
-// ML: ML
-// };
+module.exports = {
+  ML: ML
+};
 
 // es6
-export default ML;
+// export default ML;
