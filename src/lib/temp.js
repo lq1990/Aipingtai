@@ -1,6 +1,17 @@
-const math = require("mathjs");
-var res = math.multiply([[1, 2], [3, 4]], [[4, 7], [3, 1]]); // 会被默认转成mat格式，再计算
+function testData(csWidth, csHeight) {
+  var tempArr = [];
+  for (var col = 0; col < csWidth; col++) {
+    for (var row = 0; row < csHeight; row++) {
+      tempArr.push([col, row]);
+    }
+  }
+  return tempArr;
+}
+var res = testData(3, 3);
 console.log("res:", res);
+// const math = require("mathjs");
+// var res = math.multiply([[1, 2], [3, 4]], [[4, 7], [3, 1]]); // 会被默认转成mat格式，再计算
+// console.log("res:", res);
 
 // var X_original = [
 //   [1, 2],

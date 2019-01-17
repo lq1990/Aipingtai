@@ -1,26 +1,44 @@
+const math = require("mathjs");
 // require("./LogReg"); 进来的是一个json对象，而不是直接的 LogReg
 // es5 语法
-const { ML } = require("./ML.1");
+const { ML } = require("./ML");
 
 // es6
 // import ML from "./ML";
 
-var inp = [
-  { pos: [1, 2], type: "A", color: "" },
-  { pos: [2, 3], type: "A", color: "" },
-  { pos: [4, 2], type: "A", color: "" },
-  { pos: [20, 40], type: "A", color: "" },
-  { pos: [19, 40], type: "A", color: "" },
-  { pos: [40, 20], type: "A", color: "" },
-  { pos: [40, 19], type: "A", color: "" },
-  { pos: [100, 60], type: "B", color: "" },
-  { pos: [90, 60], type: "B", color: "" },
-  { pos: [88, 88], type: "B", color: "" },
-  { pos: [99, 99], type: "B", color: "" },
-  { pos: [70, 70], type: "B", color: "" },
-  { pos: [59, 100], type: "B", color: "" },
-  { pos: [60, 100], type: "B", color: "" }
-];
+// var inp = [
+//   { pos: [1, 2], type: "A", color: "" },
+//   { pos: [2, 3], type: "A", color: "" },
+//   { pos: [4, 2], type: "A", color: "" },
+//   { pos: [20, 40], type: "A", color: "" },
+//   { pos: [19, 40], type: "A", color: "" },
+//   { pos: [40, 20], type: "A", color: "" },
+//   { pos: [40, 19], type: "A", color: "" },
+//   { pos: [100, 60], type: "B", color: "" },
+//   { pos: [90, 60], type: "B", color: "" },
+//   { pos: [88, 88], type: "B", color: "" },
+//   { pos: [99, 99], type: "B", color: "" },
+//   { pos: [70, 70], type: "B", color: "" },
+//   { pos: [59, 100], type: "B", color: "" },
+//   { pos: [60, 100], type: "B", color: "" }
+// ];
+// var lr = new ML.LogReg();
+// // 链式调用的核心是 return this;
+// var res = lr
+//   .inputTrainRaw(inp)
+//   .inputCS2Mat()
+//   .featureScaling(1)
+//   .modelTrainCV(0.001, 3000);
+
+// var res = lr.inputRaw(inp).inputNew();
+// console.log("res:", res);
+
+// lr.inputNew();
+// lr.featureScaling();
+// lr.modelTrainCV(0.001, 5000);
+// var optW = lr.getOptWval();
+// console.log("optW:", optW);
+
 // var inp = [
 //   { pos: [137, 43], type: "A" },
 //   { pos: [75, 137], type: "A" },
@@ -42,13 +60,14 @@ var inp = [
 //   { pos: [7, 4], type: "B" }
 // ];
 
-var common = new ML.Common();
-var { X } = common.canvas2MLmat(inp);
-console.log("X:", X);
-var res = common.scaling(X, 1);
-console.log("res:", res);
+// var common = new ML.Common();
+// var { X, Y } = common.canvas2MLmat(inp);
+// console.log("X:", X);
+// console.log("Y: ", Y);
+// var res = common.scaling(X, 1);
+// console.log("res:", res);
 // var res = new ML.LogReg(X, Y, 0.001, 5001);
-// // console.log("res:", res);
+// console.log("res:", res);
 
 // var Wdetails = res.getWdetails(res.optWval);
 // console.log("details: ", Wdetails);

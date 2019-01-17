@@ -41,8 +41,8 @@
         <input type="button" value="运行" @click="handleRun">
       </div>
       <div class="btn-add-del-color-type">
-        <input type="button" @click="addColorType" @touchstart="addColorType" value="添加点类型">
-        <input type="button" @click="delColorType" @touchstart="delColorType" value="删除点类型">
+        <input type="button" @click="addColorType" @tap="addColorType" value="添加点类型">
+        <input type="button" @click="delColorType" @tap="delColorType" value="删除点类型">
       </div>
 
       <div class="color-type">
@@ -80,12 +80,15 @@ console.log("width:", width);
 console.log("height:", height);
 // 画布上的每个点所包含的的信息：坐标，样式
 import Konva from "konva";
+import * as math from "mathjs";
 import ML from "../lib/ML.js";
-console.log("ML:", ML);
+// console.log("ML:", ML);
 export default {
   name: "demo",
   data() {
     return {
+      drawInterval: 10,
+      // 对画布上的点进行分类后，用rect绘图时的间距，若间距为1则会延长计算渲染时长
       width: width,
       height: height,
       statusAdd: true, // 点增加、移除
@@ -120,38 +123,55 @@ export default {
       pointRadius: 3, // 点击时，画布上圆半径
       layer: null,
       stage: null,
-      colorTypeArr: [0] // 此为协助colorTypeStore用的数组
+      colorTypeArr: [0], // 此为协助colorTypeStore用的数组
+      currentAlg: "LogReg"
     };
   },
   methods: {
     handleRun() {
-      this.LogRegDrawBoundary();
+      this.LogRegDrawColorArea();
     },
-    LogRegDrawBoundary() {
-      var common = new ML.Common();
-      var { X, Y } = common.canvas2MLmat(this.listPointsPosType);
-      var LR = new ML.LogReg(X, Y, 0.001, 10000);
-      var optWval = LR.getOptWval();
-      var Wdetails = LR.getWdetails(optWval);
-      console.log(Wdetails);
-      var coefficientOfX1 = Wdetails.coefficientOfX1;
-      var yIn = Wdetails.x2Intercept;
-      this.drawLineFromIntercept(this.layer, coefficientOfX1, yIn);
-    },
-    drawLineFromIntercept(layer, coefficientOfX1, yIn) {
-      // x2 = coefficientOfX1 * x1 + yIn
-      var x2Whenx1Is0 = coefficientOfX1 * 0 + yIn;
-      var x2Whenx1IsBorder = coefficientOfX1 * this.width + yIn;
-      var line = new Konva.Line({
-        points: [0, x2Whenx1Is0, this.width, x2Whenx1IsBorder],
-        stroke: "#313e41",
-        strokeWidth: 2
-      });
+    LogRegDrawColorArea() {
+      var lr = new ML.LogReg();
+      var res = lr
+        .inputTrainRaw(this.listPointsPosType)
+        .inputCS2Mat()
+        .featureScaling()
+        .modelTrainCV(0.01, 1000, false);
+      var optW = res.optW;
+      var minVec = res.inputXScaleMinVec.valueOf();
+      var maxVec = res.inputXScaleMaxVec.valueOf();
 
-      layer.add(line);
-      layer.draw();
+      for (var col = 0; col < this.width; col += this.drawInterval) {
+        for (var row = 0; row < this.height; row += this.drawInterval) {
+          var colNew = (col - minVec[0][1]) / (maxVec[0][1] - minVec[0][1]);
+          var rowNew = (row - minVec[0][2]) / (maxVec[0][2] - minVec[0][2]);
+          // 对当前的点进行 scaling
+          var curMatNew = math.matrix([[1, colNew, rowNew]]);
+          var z = math.multiply(curMatNew, optW).valueOf()[0][0];
+          if (z < 0.5) {
+            this.drawRect4OnePoint(this.layer, col, row, "#fb5a52");
+          } else {
+            this.drawRect4OnePoint(this.layer, col, row, "#32b900");
+          }
+        }
+      }
+      this.layer.draw();
+    },
+    drawRect4OnePoint(layer, x1, x2, color) {
+      var rect = new Konva.Rect({
+        x: x1,
+        y: x2,
+        width: this.drawInterval,
+        height: this.drawInterval,
+        fill: color,
+        opacity: 0.4
+      });
+      rect.cache();
+      layer.add(rect);
     },
     showAllDataInfo() {
+      console.log("当前使用的算法：", this.currentAlg);
       console.log("所有点数据: ", this.listPointsPosType);
     },
     changeColorType(index) {
@@ -171,8 +191,20 @@ export default {
       ];
       this.showWidthStore[index] = "2px";
     },
+    /**
+     * 不同算法能分类的类别数不同
+     */
+    numOfClass(alg) {
+      switch (alg) {
+        case "LogReg":
+          return 2;
+
+        default:
+          return null;
+      }
+    },
     addColorType() {
-      if (this.colorTypeArr.length < 10) {
+      if (this.colorTypeArr.length < this.numOfClass(this.currentAlg)) {
         this.colorTypeArr.push(1);
       }
     },
@@ -376,7 +408,7 @@ export default {
       // 在整个stage即canvas画布 上绑定点击事件
       // 点击事件触发后就会执行
       this.stageOnEvent("mousedown", this.pointRadius);
-      this.stageOnEvent("touchstart", this.pointRadius * 2);
+      this.stageOnEvent("touchstart", this.pointRadius * 3);
 
       /* 函数式编程，当第二个参数用function而非匿名函数时，this指向会有不同
       this.stage.on("mousemove", function() {
