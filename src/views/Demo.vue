@@ -18,31 +18,37 @@
 
     <div id="container"></div>
 
+    <div style="display: flex; justify-content: center; margin: 15px 0;">
+      <el-button type="danger" 
+        @mousedown.native="handleRun"
+        @touchstart.native="handleRun" style="width: 100px;">运行</el-button>
+    </div>
+
     <div class="btn-wrap">
       <!-- PC、移动端区别对待点击事件。
       PC: click (== tap of Mobile),
-      Mobile: touchstart (==mousedown of PC) -->
+      Mobile: touchstart (==mousedown of PC)-->
       <div class="btn-point">
         <input
           type="button"
           value="添加一点"
-          @click="statusAdd = true"
+          @mousedown="statusAdd = true"
           @touchstart="statusAdd = true"
           :class="{showBtnBorder: statusAdd}"
         >
         <input
           type="button"
           value="移除某点"
-          @click="statusAdd = false"
+          @mousedown="statusAdd = false"
           @touchstart="statusAdd = false"
           :class="{showBtnBorder: !statusAdd}"
         >
-        <input type="button" value="清空所有" @click="handleClearAll" @touchstart="handleClearAll">
-        <input type="button" value="运行" @click="handleRun">
+        <input type="button" value="清空所有" @mousedown="handleClearAll" @touchstart="handleClearAll">
+        <input type="button" value="所有点信息" @mousedown="showAllDataInfo" @touchstart="showAllDataInfo">
       </div>
       <div class="btn-add-del-color-type">
-        <input type="button" @click="addColorType" @tap="addColorType" value="添加点类型">
-        <input type="button" @click="delColorType" @tap="delColorType" value="删除点类型">
+        <input type="button" @mousedown="addColorType" @tap="addColorType" value="添加点类型">
+        <input type="button" @mousedown="delColorType" @tap="delColorType" value="删除点类型">
       </div>
 
       <div class="color-type">
@@ -58,14 +64,10 @@
             borderStyle: 'solid',
             borderColor: colorTypeStore[index]
             }"
-          @click="changeColorType(index)"
-        >
-        
-        </div>
+          @mousedown="changeColorType(index)"
+          @touchstart="changeColorType(index)"
+        ></div>
       </div>
-    </div>
-    <div style="display: flex; justify-content: center; margin-top: 10px;">
-      <input type="button" value="allDataInfo" @click="showAllDataInfo">
     </div>
   </div>
 </template>
@@ -128,6 +130,74 @@ export default {
     };
   },
   methods: {
+    initListPoints() {
+      this.listPointsPosType.push(
+        {
+          pos: [62, 261],
+          color: "#fb5a52",
+          type: "A"
+        },
+        {
+          pos: [87, 196],
+          color: "#fb5a52",
+          type: "A"
+        },
+        {
+          pos: [118, 145],
+          color: "#fb5a52",
+          type: "A"
+        },
+        {
+          pos: [141, 196],
+          color: "#fb5a52",
+          type: "A"
+        },
+        {
+          pos: [155, 261],
+          color: "#fb5a52",
+          type: "A"
+        },
+        {
+          pos: [266, 145],
+          color: "#32b900",
+          type: "B"
+        },
+        {
+          pos: [266, 196],
+          color: "#32b900",
+          type: "B"
+        },
+        {
+          pos: [266, 261],
+          color: "#32b900",
+          type: "B"
+        }
+      );
+    },
+    /**
+     * 每次点击画布时，都会把 listPointsPosType 中数据存储到 sessionStorage;
+     * sessionStorage 当关闭页面时，数据就没了。
+     * 或者点击 清空所有 按钮，也会清空 Storage.
+     */
+    saveListInStorage() {
+      sessionStorage.setItem(
+        "listPoints",
+        JSON.stringify(this.listPointsPosType)
+      );
+    },
+    /**
+     * 在 mounted 时，加载
+     */
+    loadListFromStorage() {
+      const data = sessionStorage.getItem("listPoints") || "[]";
+      this.listPointsPosType = JSON.parse(data);
+    },
+    /**
+     * 当点击清空所有时，sessionStorage 就会被清空
+     */
+    clearStorage() {
+      sessionStorage.clear();
+    },
     handleRun() {
       this.LogRegDrawColorArea();
     },
@@ -137,7 +207,7 @@ export default {
         .inputTrainRaw(this.listPointsPosType)
         .inputCS2Mat()
         .featureScaling()
-        .modelTrainCV(0.01, 1000, false);
+        .modelTrainCV(0.002, 5000, false);
       var optW = res.optW;
       var minVec = res.inputXScaleMinVec.valueOf();
       var maxVec = res.inputXScaleMaxVec.valueOf();
@@ -165,7 +235,7 @@ export default {
         width: this.drawInterval,
         height: this.drawInterval,
         fill: color,
-        opacity: 0.4
+        opacity: 0.35
       });
       rect.cache();
       layer.add(rect);
@@ -200,7 +270,7 @@ export default {
           return 2;
 
         default:
-          return null;
+          return 10;
       }
     },
     addColorType() {
@@ -270,11 +340,9 @@ export default {
      * 2. 清空舞台
      */
     handleClearAll() {
-      // console.log("this.listPoints:", this.listPoints);
-      // this.listPoints = [];
       this.listPointsPosType = [];
-      // console.log("this.listPoints:", this.listPoints);
       this.clearStage(this.stage, this.layer);
+      this.clearStorage();
     },
     /**
      * 10种颜色对应10类
@@ -321,31 +389,14 @@ export default {
         console.log(x, y);
 
         if (this.statusAdd) {
-          // this.listPoints.push([x, y]);
-          // console.log("color: " + this.currentColor);
-
           var type = this.typeOfColor(this.currentColor);
           this.listPointsPosType.push({
             pos: [x, y],
             color: this.currentColor,
             type: type
           });
-          // console.log(
-          //   "%clistPointsPosType: ",
-          //   "color:red",
-          //   this.listPointsPosType
-          // );
         } else {
           // 在移除状态时，点击位置附近较近的一个点会被移除
-
-          /*
-          this.listPoints.forEach((item, index) => {
-            var distance = Math.sqrt((item[0] - x) ** 2 + (item[1] - y) ** 2);
-            if (distance < removeDisThreshold) {
-              this.listPoints.splice(index, 1);
-            }
-          });
-          */
           this.listPointsPosType.forEach((item, index) => {
             var distance = Math.sqrt(
               (item.pos[0] - x) ** 2 + (item.pos[1] - y) ** 2
@@ -355,14 +406,13 @@ export default {
             }
           });
         }
-        // console.log(this.listPoints);
 
         // 画之前清空画布
         this.clearStage(this.stage, this.layer);
 
-        // this.drawPoints(this.layer, this.listPoints, this.currentColor);
         this.drawPointsFromList(this.layer, this.listPointsPosType);
         this.drawStageBorder();
+        this.saveListInStorage();
       });
     },
     /**
@@ -410,6 +460,8 @@ export default {
       this.stageOnEvent("mousedown", this.pointRadius);
       this.stageOnEvent("touchstart", this.pointRadius * 3);
 
+      this.drawPointsFromList(this.layer, this.listPointsPosType);
+
       /* 函数式编程，当第二个参数用function而非匿名函数时，this指向会有不同
       this.stage.on("mousemove", function() {
         console.log("mousemove");
@@ -420,6 +472,9 @@ export default {
   },
   created() {},
   mounted() {
+    console.log("mounted...");
+    this.loadListFromStorage();
+    this.initListPoints();
     this.newCanvas();
   }
 };
@@ -463,5 +518,11 @@ export default {
 div.konvajs-content {
   /* border: 1px solid #000 !important; */
   margin: 0 auto !important;
+}
+html body div#app div.demo div button.el-button.el-button--danger {
+  background-color: #fb5a52 !important;
+}
+html body div#app div.demo div button.el-button.el-button--danger:hover {
+  background-color: #fa7c75 !important;
 }
 </style>

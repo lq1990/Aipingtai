@@ -313,7 +313,7 @@ for (var i in Common.prototype) {
 LogReg.prototype.modelTrainCV = function(stepSize, stepTotal, isLogW) {
   var X = this.inputX;
   var Y = this.inputY;
-  this.stepSize = stepSize || 0.001;
+  this.stepSize = stepSize || 0.01;
   this.stepTotal = stepTotal || 5001;
   this.isLogW = isLogW || false;
   // 初始化
