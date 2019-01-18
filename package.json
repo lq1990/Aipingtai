@@ -9,11 +9,13 @@
     "test:unit": "vue-cli-service test:unit"
   },
   "dependencies": {
+    "echarts": "^4.2.0-rc.2",
     "element-ui": "^2.4.5",
     "konva": "^2.6.0",
     "mathjs": "^5.4.1",
     "numeric": "^1.2.6",
     "vue": "^2.5.21",
+    "vue-echarts": "^4.0.0-beta.1",
     "vue-konva": "^2.0.0",
     "vue-router": "^3.0.1",
     "vuex": "^3.0.1"

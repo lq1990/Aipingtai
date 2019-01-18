@@ -41,6 +41,7 @@ function Common() {
 }
 
 Common.prototype = {
+  optimizer() {},
   inputTrainRaw: function(inp) {
     this.inputTrainRaw = inp;
     return this;
@@ -327,6 +328,7 @@ LogReg.prototype.modelTrainCV = function(stepSize, stepTotal, isLogW) {
     var H = this.sigmoid(Z);
     var HminusY = math.subtract(H, Y);
     var dCdW = math.multiply(XT, HminusY);
+    // 使用传统的梯度下降法, W -= alpha * dCdW
     W = math.subtract(W, math.multiply(this.stepSize, dCdW));
     if (this.isLogW) {
       // 记录每一步

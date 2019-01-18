@@ -19,9 +19,13 @@
     <div id="container"></div>
 
     <div style="display: flex; justify-content: center; margin: 15px 0;">
-      <el-button type="danger" 
-        @mousedown.native="handleRun"
-        @touchstart.native="handleRun" style="width: 100px;">运行</el-button>
+      <!-- <el-tooltip effect="dark"  content="运行一小会！" placement="left"> -->
+        <el-button type="danger" @click="handleRun" :style="{width: width/3+'px'}">运行</el-button>
+      <!-- </el-tooltip> -->
+
+      <el-button type="danger" @click="handleParams">参数</el-button>
+
+      <!-- <input class="btnRun" type="button" value="运行" @click="handleRun"> -->
     </div>
 
     <div class="btn-wrap">
@@ -33,22 +37,20 @@
           type="button"
           value="添加一点"
           @mousedown="statusAdd = true"
-          @touchstart="statusAdd = true"
           :class="{showBtnBorder: statusAdd}"
         >
         <input
           type="button"
           value="移除某点"
           @mousedown="statusAdd = false"
-          @touchstart="statusAdd = false"
           :class="{showBtnBorder: !statusAdd}"
         >
-        <input type="button" value="清空所有" @mousedown="handleClearAll" @touchstart="handleClearAll">
-        <input type="button" value="所有点信息" @mousedown="showAllDataInfo" @touchstart="showAllDataInfo">
+        <input type="button" value="清空所有" @mousedown="handleClearAll">
+        <input type="button" value="所有点信息" @mousedown="showAllDataInfo">
       </div>
       <div class="btn-add-del-color-type">
-        <input type="button" @mousedown="addColorType" @tap="addColorType" value="添加点类型">
-        <input type="button" @mousedown="delColorType" @tap="delColorType" value="删除点类型">
+        <input type="button" @mousedown="addColorType" value="添加点类型">
+        <input type="button" @mousedown="delColorType" value="删除点类型">
       </div>
 
       <div class="color-type">
@@ -65,9 +67,12 @@
             borderColor: colorTypeStore[index]
             }"
           @mousedown="changeColorType(index)"
-          @touchstart="changeColorType(index)"
         ></div>
       </div>
+    </div>
+
+    <div class="myfig">
+      <myfigure class="myfigure" :log-wval="logWval" :width="width" :height="height*2/3"></myfigure>
     </div>
   </div>
 </template>
@@ -84,12 +89,15 @@ console.log("height:", height);
 import Konva from "konva";
 import * as math from "mathjs";
 import ML from "../lib/ML.js";
-// console.log("ML:", ML);
+import Figure from "../components/Figure.vue";
 export default {
   name: "demo",
+  components: {
+    myfigure: Figure
+  },
   data() {
     return {
-      drawInterval: 10,
+      drawInterval: 20,
       // 对画布上的点进行分类后，用rect绘图时的间距，若间距为1则会延长计算渲染时长
       width: width,
       height: height,
@@ -106,7 +114,7 @@ export default {
         "0px",
         "0px",
         "0px"
-      ], // 10中颜色，被点击的颜色即当前用的颜色会有边框
+      ], // 10种颜色，被点击的颜色即当前用的颜色会有边框
       colorTypeStore: [
         "#fb5a52",
         "#32b900",
@@ -126,49 +134,59 @@ export default {
       layer: null,
       stage: null,
       colorTypeArr: [0], // 此为协助colorTypeStore用的数组
-      currentAlg: "LogReg"
+      currentAlg: "LogReg",
+      logWval: [] // 存储了模型参数 W 对应每一步的值. Array, [第i步][第j个w][0]
     };
   },
   methods: {
+    handleParams() {
+      console.log(this.logWval); // [][][] 1：第i步，2：第j个w， 3：为0
+      // console.log(this.logWval[967][0][0]);
+    },
     initListPoints() {
+      if (this.listPointsPosType.length != 0) {
+        // 如果 list中已经有数据了，则刷新页面并不会 往list里push数据。
+        return;
+      }
+      // 当list中没有数据时，会往list中push
       this.listPointsPosType.push(
         {
-          pos: [62, 261],
+          pos: [this.width / 8, (this.height * 2) / 3],
           color: "#fb5a52",
           type: "A"
         },
         {
-          pos: [87, 196],
+          pos: [(this.width * 3) / 16, this.height / 2],
           color: "#fb5a52",
           type: "A"
         },
         {
-          pos: [118, 145],
+          pos: [(this.width * 4) / 16, (this.height * 1) / 3],
           color: "#fb5a52",
           type: "A"
         },
         {
-          pos: [141, 196],
+          pos: [(this.width * 5) / 16, this.height / 2],
           color: "#fb5a52",
           type: "A"
         },
         {
-          pos: [155, 261],
+          pos: [(this.width * 6) / 16, (this.height * 2) / 3],
           color: "#fb5a52",
           type: "A"
         },
         {
-          pos: [266, 145],
+          pos: [(this.width * 2) / 3, (this.height * 1) / 3],
           color: "#32b900",
           type: "B"
         },
         {
-          pos: [266, 196],
+          pos: [(this.width * 2) / 3, this.height / 2],
           color: "#32b900",
           type: "B"
         },
         {
-          pos: [266, 261],
+          pos: [(this.width * 2) / 3, (this.height * 2) / 3],
           color: "#32b900",
           type: "B"
         }
@@ -184,6 +202,8 @@ export default {
         "listPoints",
         JSON.stringify(this.listPointsPosType)
       );
+      // 为了避免刷新页面时，存储的模型参数 logWval 被清除
+      sessionStorage.setItem("params", JSON.stringify(this.logWval));
     },
     /**
      * 在 mounted 时，加载
@@ -191,6 +211,9 @@ export default {
     loadListFromStorage() {
       const data = sessionStorage.getItem("listPoints") || "[]";
       this.listPointsPosType = JSON.parse(data);
+
+      const params = sessionStorage.getItem("params") || "[]";
+      this.logWval = JSON.parse(params);
     },
     /**
      * 当点击清空所有时，sessionStorage 就会被清空
@@ -198,8 +221,32 @@ export default {
     clearStorage() {
       sessionStorage.clear();
     },
-    handleRun() {
+    handleRun(e) {
+      console.log("run..., type: " + e.type);
       this.LogRegDrawColorArea();
+
+      // 运行时，把list和logWval保存
+      this.saveListInStorage();
+    },
+    handleRunTap() {
+      console.log("run tap...");
+      // this.LogRegDrawColorArea();
+    },
+    handleRunTouchend() {
+      console.log("run touchend...");
+    },
+    handleRunTouchstart() {
+      console.log("run touchstart...");
+    },
+    handleRunMousedown() {
+      console.log("run mousedown...");
+    },
+    handleRunMouseup() {
+      console.log("run mouseup...");
+    },
+    handleRunClick() {
+      console.log("run Click...");
+      // this.LogRegDrawColorArea();
     },
     LogRegDrawColorArea() {
       var lr = new ML.LogReg();
@@ -207,7 +254,9 @@ export default {
         .inputTrainRaw(this.listPointsPosType)
         .inputCS2Mat()
         .featureScaling()
-        .modelTrainCV(0.002, 5000, false);
+        .modelTrainCV(0.01, 1000, true);
+      console.log(res);
+      this.logWval = res.logWval;
       var optW = res.optW;
       var minVec = res.inputXScaleMinVec.valueOf();
       var maxVec = res.inputXScaleMaxVec.valueOf();
@@ -219,21 +268,34 @@ export default {
           // 对当前的点进行 scaling
           var curMatNew = math.matrix([[1, colNew, rowNew]]);
           var z = math.multiply(curMatNew, optW).valueOf()[0][0];
-          if (z < 0.5) {
-            this.drawRect4OnePoint(this.layer, col, row, "#fb5a52");
+          if (z < 0) {
+            this.drawRect4OnePoint(
+              this.layer,
+              col,
+              row,
+              this.drawInterval,
+              "#fb5a52"
+            );
           } else {
-            this.drawRect4OnePoint(this.layer, col, row, "#32b900");
+            this.drawRect4OnePoint(
+              this.layer,
+              col,
+              row,
+              this.drawInterval,
+              "#32b900"
+            );
           }
         }
       }
       this.layer.draw();
     },
-    drawRect4OnePoint(layer, x1, x2, color) {
+    drawRect4OnePoint(layer, x1, x2, drawInterval, color) {
+      // 以 x1、x2 为矩形的重心来画
       var rect = new Konva.Rect({
-        x: x1,
-        y: x2,
-        width: this.drawInterval,
-        height: this.drawInterval,
+        x: x1 - 0.5 * drawInterval,
+        y: x2 - 0.5 * drawInterval,
+        width: drawInterval,
+        height: drawInterval,
         fill: color,
         opacity: 0.35
       });
@@ -457,8 +519,8 @@ export default {
       this.drawStageBorder();
       // 在整个stage即canvas画布 上绑定点击事件
       // 点击事件触发后就会执行
-      this.stageOnEvent("mousedown", this.pointRadius);
-      this.stageOnEvent("touchstart", this.pointRadius * 3);
+      this.stageOnEvent("mousedown", this.pointRadius * 2);
+      this.stageOnEvent("touchstart", this.pointRadius * 4);
 
       this.drawPointsFromList(this.layer, this.listPointsPosType);
 
@@ -482,6 +544,24 @@ export default {
 
 <style lang="scss" scoped>
 .demo {
+  .btnRun {
+    background-color: #fb5a52;
+    border: 2px solid #fb5a52;
+    color: white;
+    width: 100px;
+    height: 30px;
+    margin: 0 10px;
+  }
+  .btnRun:hover,
+  .btnRun:focus {
+    background-color: #fa736c;
+    border: 2px solid #fa736c;
+  }
+  .btnRun:active {
+    background-color: #fb0000;
+    border: 2px solid #fb0000;
+  }
+
   .btn-wrap {
     .btn-point {
       margin-top: 10px;
@@ -511,6 +591,14 @@ export default {
       }
     }
   }
+
+  .myfig {
+    .myfigure {
+      margin: 20px auto 100px;
+      padding-top: 10px;
+      border-top: 1px solid #ccc;
+    }
+  }
 }
 </style>
 
@@ -519,10 +607,17 @@ div.konvajs-content {
   /* border: 1px solid #000 !important; */
   margin: 0 auto !important;
 }
-html body div#app div.demo div button.el-button.el-button--danger {
+
+button.el-button.el-button--danger {
   background-color: #fb5a52 !important;
 }
-html body div#app div.demo div button.el-button.el-button--danger:hover {
+
+button.el-button.el-button--danger:focus,
+button.el-button.el-button--danger:hover {
   background-color: #fa7c75 !important;
+}
+button.el-button.el-button--danger.is-active,
+button.el-button.el-button--danger:active {
+  background-color: #fb5a52 !important;
 }
 </style>
