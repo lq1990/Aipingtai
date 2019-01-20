@@ -1,26 +1,39 @@
 const math = require("mathjs");
 
-var x = [
-  [1, 2],
-  [2, 3],
-  [4, 2],
-  [20, 40],
-  [19, 40],
-  [40, 20],
-  [40, 19],
-  [100, 60],
-  [90, 60],
-  [88, 88],
-  [99, 99],
-  [70, 70],
-  [59, 100],
-  [60, 101]
-];
+var a = [[[0], [0], [0]]];
+a.push([[1], [2], [3]]);
+a.push([[4], [5], [6]]);
+a.push([[7], [8], [9]]);
+console.log("a:", a);
+var ma = math.matrix(a);
+console.log("ma:", ma);
+// var res = math.reshape(ma, [3, 3]);
+ma.reshape([a.length, 3]);
+// console.log("res:", res);
+console.log("ma:", ma);
+var mean_ma = math.mean(ma, 0).reshape([3, 1]);
+console.log("mean_ma:", mean_ma);
+// var x = [
+//   [1, 2],
+//   [2, 3],
+//   [4, 2],
+//   [20, 40],
+//   [19, 40],
+//   [40, 20],
+//   [40, 19],
+//   [100, 60],
+//   [90, 60],
+//   [88, 88],
+//   [99, 99],
+//   [70, 70],
+//   [59, 100],
+//   [60, 101]
+// ];
 
-var m1 = math.matrix(x);
-console.log("m1:", m1);
-var m1Val = m1.valueOf();
-console.log(m1Val[0][0]);
+// var m1 = math.matrix(x);
+// console.log("m1:", m1);
+// var m1Val = m1.valueOf();
+// console.log(m1Val[0][0]);
 // // 使用 subset 替换
 // var m1 = math.matrix(x);
 // var res = math.subset(

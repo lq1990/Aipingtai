@@ -41,7 +41,6 @@ function Common() {
 }
 
 Common.prototype = {
-  optimizer() {},
   inputTrainRaw: function(inp) {
     this.inputTrainRaw = inp;
     return this;
@@ -49,7 +48,7 @@ Common.prototype = {
   /**
    * 将canvas过来的数据inputTrainRaw转成 矩阵格式的 inputX, inputY
    *
-   * inputX: Features, inputX会被不断改造，直到最终输入给model
+   * inputX: Features, inputX会被不断改造，直到最终输入给model，格式
    * inputY: Labels
    */
   inputCS2Mat: function() {
@@ -291,6 +290,90 @@ Common.prototype = {
 };
 
 // ========================================================================
+// =========================== Optimizer ==================================
+// ========================================================================
+/**
+ * Optimizer 只负责 W = W - alpha* dCdW 中 W的优化。
+ * 不同算法计算 dCdW方式不同。
+ *
+ * 输入：学习率alpha, 梯度dCdW
+ * @returns 输出：当前迭代步对应的 W
+ *
+ * 优化器 涉及到：
+ * 1. Gradient Descent 标准梯度下降法
+ * 2. RMSProp
+ * 3. Adadelta
+ */
+function Optimizer() {
+  this.pho = 0.9; // 表示梯度下降的动力
+  this.epsilon = 10 ** -8; // 最小自然数。防止分母为0.
+}
+
+Optimizer.prototype = {
+  /**
+   *
+   * @param {*} oldW 上一步的W，格式：math.matrix
+   * @param {*} stepSize 学习率、步长
+   * @param {*} gt gradient of 当前步, 格式：math.matrix
+   * @returns 经过当前步 改进后的W，格式：math.matrix
+   */
+  gradientDescent: function(oldW, stepSize, gt) {
+    var W = math.subtract(oldW, math.multiply(stepSize, gt));
+    // var newW = curW - stepSize * gt;
+    return W;
+  },
+  /**
+   * rmsProp取前几个 gt，而非所有之前的gt。
+   * @param {*} oldW 上一个W，格式：math.matrix
+   * @param {*} stepSize 步长、学习率
+   * @param {*} gt 当前这一步的 g，格式：math.matrix ，多行1列
+   * @param {*} gt_1 前几步中的g的arr，不算当前这一个
+   */
+  rmsProp: function(oldW, stepSize, gt, gt_1) {
+    // gt_1里面存储了之前所有的g。需要先裁剪
+
+    this.pho = 0.9;
+    this.epsilon = 10 ** -8;
+    var len = oldW.size()[0];
+    var W;
+    // 最开始第一步时，gt_1Arr是空的，用标准梯度下降法.
+    if (gt_1.length == 0) {
+      W = this.gradientDescent(oldW, stepSize, gt);
+      return W;
+    }
+    // console.log("math.dotPow(gt_1, 2): ", math.dotPow(gt_1, 2));
+
+    var g2t_1 = math.dotPow(math.matrix(gt_1), 2);
+    var g2t_1_reshape = math.reshape(g2t_1, [gt_1.length, len]); // reshape原因是：把三维的数组变成二维的。
+
+    var E_g2t_1_old = math.mean(g2t_1_reshape, 0);
+
+    var E_g2t_1 = math.reshape(E_g2t_1_old, [len, 1]); // 前几个 g的平方的平均值（不算当前gt）。结果 3行1列
+    // console.log("E_g2t_1:", E_g2t_1);
+
+    var g2t = math.dotPow(gt, 2); // 当前gt的平方。 结果 3行1列
+    // console.log("g2t:", g2t);
+    // console.log("this.pho:", this.pho);
+    // var E_g2t = this.pho * E_g2t_1 + (1 - this.pho) * g2t;
+    var E_g2t = math.add(
+      math.dotMultiply(this.pho, E_g2t_1),
+      math.dotMultiply(math.subtract(1, this.pho), g2t)
+    );
+    var rms_gt = math.sqrt(math.add(E_g2t, this.epsilon));
+    // var dxt = (-stepSize * gt) / rms_gt;
+    var dxt = math.dotDivide(math.multiply(-stepSize, gt), rms_gt);
+    // var W = oldW + dxt;
+    W = math.add(oldW, dxt);
+    return W;
+  },
+
+  /**
+   * Adadelta 从 Adagrad, RMSProp 升级而来;
+   * Adadelta 不需要设置初始学习率，自适应;
+   */
+  adadelta: function() {}
+};
+// ========================================================================
 // =========================== LogReg =====================================
 // ========================================================================
 /**
@@ -311,25 +394,57 @@ for (var i in Common.prototype) {
   LogReg.prototype[i] = Common.prototype[i];
 }
 
-LogReg.prototype.modelTrainCV = function(stepSize, stepTotal, isLogW) {
+for (var j in Optimizer.prototype) {
+  LogReg.prototype[j] = Optimizer.prototype[j];
+}
+
+/**
+ *
+ * @param {*} stepSize 0.01 as default
+ * @param {*} stepTotal 1000 as default
+ * @param {*} optimizer 优化算法的选择. 0: gd as default, 1: rmsProp
+ * @param {*} isLogW 是否记录每一步的模型参数W，false as default
+ */
+LogReg.prototype.modelTrainCV = function(
+  stepSize,
+  stepTotal,
+  optimizer,
+  isLogW
+) {
+  this.optimizer = optimizer || "gd";
   var X = this.inputX;
   var Y = this.inputY;
   this.stepSize = stepSize || 0.01;
-  this.stepTotal = stepTotal || 5001;
+  this.stepTotal = stepTotal || 1000;
   this.isLogW = isLogW || false;
   // 初始化
   var W = math.ones(X.size()[1], 1); // 针对逻辑回归二分类问题
   var XT = math.transpose(X);
-  this.logWval = [W.valueOf()]; // 记录W的变化
+  this.logWval = [W.valueOf()]; // 记录W的变化，从初始值开始记录
   // 迭代优化求W
+  var dCdWArr = []; // 记录每一步的 dCdW 即gt.
   for (var i = 0; i < this.stepTotal; i++) {
     var Z = math.multiply(X, W); // Z = XW
 
     var H = this.sigmoid(Z);
     var HminusY = math.subtract(H, Y);
     var dCdW = math.multiply(XT, HminusY);
-    // 使用传统的梯度下降法, W -= alpha * dCdW
-    W = math.subtract(W, math.multiply(this.stepSize, dCdW));
+
+    if (optimizer == "gd" || optimizer == 0) {
+      // 使用传统的梯度下降法, W -= alpha * dCdW
+      // W = math.subtract(W, math.multiply(this.stepSize, dCdW));
+      W = this.gradientDescent(W, this.stepSize, dCdW);
+    } else if (optimizer == "rmsProp" || optimizer == 1) {
+      // RMSProp
+      W = this.rmsProp(W, this.stepSize, dCdW, dCdWArr); // 多行1列
+      dCdWArr.push(dCdW.valueOf());
+
+      // dCdW不需要存储所有值钱的梯度，只用前几个。
+      while (dCdWArr.length > 100) {
+        dCdWArr.shift();
+      }
+    }
+    // console.log("i: " + i + ", dCdWArr.length: " + dCdWArr.length);
     if (this.isLogW) {
       // 记录每一步
       this.logWval.push(W.valueOf());
@@ -340,18 +455,15 @@ LogReg.prototype.modelTrainCV = function(stepSize, stepTotal, isLogW) {
   this.optWdetails = this.calcWdetails(this.optWval);
   return this;
 };
-
 LogReg.prototype.modelTest = function() {
   return this;
 };
-
 LogReg.prototype.getOptWval = function() {
   return this.optWval;
 };
 LogReg.prototype.getOptWdetails = function() {
   return this.optWdetails;
 };
-
 /**
  * 输入：一个W
  *
@@ -381,6 +493,54 @@ LogReg.prototype.calcWdetails = function(aWval) {
   };
 };
 
+/**
+ * wArr 输入，格式：多个 3行1列
+ * @returns costArr, 格式：[ v1,v2, v3,... ]
+ */
+LogReg.prototype.calcCostArr = function() {
+  var wArr = this.logWval;
+  var costArr = [],
+    Z,
+    H;
+  var X = this.inputX;
+  var Y = this.inputY;
+  var left, right, temp1, temp2, cost;
+  for (var i = 0; i < wArr.length; i++) {
+    Z = math.multiply(X, wArr[i]);
+    H = this.sigmoid(Z);
+    left = math.dotMultiply(math.multiply(-1, Y), math.log(H));
+
+    // console.log("left:", left);
+    // right = -(1-Y)*log(1-H)
+    temp1 = math.subtract(Y, 1);
+    temp2 = math.log(math.subtract(1, H));
+    right = math.dotMultiply(temp1, temp2);
+    // console.log("right:", right);
+    cost = math.add(left, right); // cost此时时 多行1列
+    var cost_mean = math.mean(cost);
+
+    costArr.push(cost_mean);
+    // console.log("cost:", cost); // NaN
+  }
+  return costArr;
+};
+
+LogReg.prototype.calcOneCost = function(w) {
+  var Z, H;
+  var X = this.inputX;
+  var Y = this.inputY;
+  var left, right, temp1, temp2, cost;
+  Z = math.multiply(X, w);
+  H = this.sigmoid(Z);
+  left = math.dotMultiply(math.multiply(-1, Y), math.log(H));
+  // right = -(1-Y)*log(1-H)
+  temp1 = math.subtract(Y, 1);
+  temp2 = math.log(math.subtract(1, H));
+  right = math.dotMultiply(temp1, temp2);
+  cost = math.add(left, right);
+  return cost;
+};
+
 // ========================================================================
 // =========================== NN =========================================
 // ========================================================================
@@ -391,7 +551,7 @@ LogReg.prototype.calcWdetails = function(aWval) {
 // es5写法：导出一个模块对象。 是一个json对象。
 // 在其他文件使用时，也是import进了json对象
 // module.exports = {
-//   ML: ML
+// ML: ML
 // };
 
 // es6

@@ -254,7 +254,7 @@ export default {
         .inputTrainRaw(this.listPointsPosType)
         .inputCS2Mat()
         .featureScaling()
-        .modelTrainCV(0.01, 1000, true);
+        .modelTrainCV(0.1, 100, "rmsProp", true);
       console.log(res);
       this.logWval = res.logWval;
       var optW = res.optW;

@@ -6,32 +6,36 @@ const { ML } = require("./ML");
 // es6
 // import ML from "./ML";
 
-// var inp = [
-//   { pos: [1, 2], type: "A", color: "" },
-//   { pos: [2, 3], type: "A", color: "" },
-//   { pos: [4, 2], type: "A", color: "" },
-//   { pos: [20, 40], type: "A", color: "" },
-//   { pos: [19, 40], type: "A", color: "" },
-//   { pos: [40, 20], type: "A", color: "" },
-//   { pos: [40, 19], type: "A", color: "" },
-//   { pos: [100, 60], type: "B", color: "" },
-//   { pos: [90, 60], type: "B", color: "" },
-//   { pos: [88, 88], type: "B", color: "" },
-//   { pos: [99, 99], type: "B", color: "" },
-//   { pos: [70, 70], type: "B", color: "" },
-//   { pos: [59, 100], type: "B", color: "" },
-//   { pos: [60, 100], type: "B", color: "" }
-// ];
-// var lr = new ML.LogReg();
+var inp = [
+  { pos: [1, 2], type: "A", color: "" },
+  { pos: [2, 3], type: "A", color: "" },
+  { pos: [4, 2], type: "A", color: "" },
+  { pos: [20, 40], type: "A", color: "" },
+  { pos: [19, 40], type: "A", color: "" },
+  { pos: [40, 20], type: "A", color: "" },
+  { pos: [40, 19], type: "A", color: "" },
+  { pos: [100, 60], type: "B", color: "" },
+  { pos: [90, 60], type: "B", color: "" },
+  { pos: [88, 88], type: "B", color: "" },
+  { pos: [99, 99], type: "B", color: "" },
+  { pos: [70, 70], type: "B", color: "" },
+  { pos: [59, 100], type: "B", color: "" },
+  { pos: [60, 100], type: "B", color: "" }
+];
+var lr = new ML.LogReg();
 // // 链式调用的核心是 return this;
-// var res = lr
-//   .inputTrainRaw(inp)
-//   .inputCS2Mat()
-//   .featureScaling(1)
-//   .modelTrainCV(0.001, 3000);
+var res = lr
+  .inputTrainRaw(inp)
+  .inputCS2Mat()
+  .featureScaling(1)
+  .modelTrainCV(0.1, 100, "rmsProp", true);
+//   .modelTrainCV(0.1, 100, "gd", true);
 
 // var res = lr.inputRaw(inp).inputNew();
 // console.log("res:", res);
+// console.log("res.logWval:", res.logWval);
+var cost = lr.calcCostArr(res.logWval);
+console.log("cost:", cost);
 
 // lr.inputNew();
 // lr.featureScaling();

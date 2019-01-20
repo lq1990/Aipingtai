@@ -14,6 +14,7 @@
 //  纵坐标为 W值
 // 使用Konva，自己做
 import Konva from "konva";
+import math from "mathjs";
 export default {
   name: "myfigure",
   data() {
@@ -22,7 +23,7 @@ export default {
       layer: null
     };
   },
-  props: ["logWval", "width", "height"], // props 当做data用。可this指引
+  props: ["logWval", "costArr", "width", "height"], // props 当做data用。可this指引
   // logWval: [] // 存储了模型参数 W 对应每一步的值. Array, [第i步][第j个w][0]
   components: {},
   methods: {
@@ -33,6 +34,8 @@ export default {
     plot(W, interval) {
       var x, w0, w1, w2;
       for (var i = 0; i < W.length; i += interval) {
+        var cost = this.calcOneCost(W[i]);
+        console.log("cost:", cost);
         x = i;
         w0 = W[i][0][0];
         w1 = W[i][1][0];
@@ -88,6 +91,21 @@ export default {
       this.layer = new Konva.Layer();
       this.stage.add(this.layer);
       this.drawStageBorder();
+    },
+    calcOneCost(w) {
+      var Z, H;
+      var X = this.inputX;
+      var Y = this.inputY;
+      var left, right, temp1, temp2, cost;
+      Z = math.multiply(X, w);
+      H = this.sigmoid(Z);
+      left = math.dotMultiply(-Y, math.log(H));
+      // right = -(1-Y)*log(1-H)
+      temp1 = math.subtract(Y, 1);
+      temp2 = math.log(math.subtract(1, H));
+      right = math.dotMultiply(temp1, temp2);
+      cost = math.add(left, right);
+      return cost;
     }
   },
   mounted() {
