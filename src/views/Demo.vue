@@ -20,9 +20,8 @@
 
     <div style="display: flex; justify-content: center; margin: 15px 0;">
       <!-- <el-tooltip effect="dark"  content="运行一小会！" placement="left"> -->
-        <el-button type="danger" @click="handleRun" :style="{width: width/3+'px'}">运行</el-button>
+      <el-button type="danger" @click="handleRun" :style="{width: width/3+'px'}">运行</el-button>
       <!-- </el-tooltip> -->
-
       <el-button type="danger" @click="handleParams">参数</el-button>
 
       <!-- <input class="btnRun" type="button" value="运行" @click="handleRun"> -->
@@ -71,9 +70,13 @@
       </div>
     </div>
 
-    <div class="myfig">
-      <myfigure class="myfigure" :cost-arr="costArr" :log-wval="logWval" :width="width" :height="height*2/3"></myfigure>
-    </div>
+    <!-- <div class="myfig"> -->
+    <!-- <myfigure class="myfigure" :cost-arr="costArr" :log-wval="logWval" :width="width" :height="height*2/3"></myfigure> -->
+    <chart
+      class="myfigure"
+      :style="{width: width+'px', height:height*2/3+'px'}"
+    ></chart>
+    <!-- </div> -->
   </div>
 </template>
 
@@ -90,10 +93,12 @@ import Konva from "konva";
 import * as math from "mathjs";
 import ML from "../lib/ML.js";
 import Figure from "../components/Figure.vue";
+import Chart from "../components/Chart.vue";
 export default {
   name: "demo",
   components: {
-    myfigure: Figure
+    // myfigure: Figure,
+    chart: Chart
   },
   data() {
     return {
@@ -277,13 +282,33 @@ export default {
           // 对当前的点进行 scaling
           var curMatNew = math.matrix([[1, colNew, rowNew]]);
           var z = math.multiply(curMatNew, optW).valueOf()[0][0];
-          if (z < 0) {
+          if (z < -3) {
+            // 当 z 为3时，h 即概率为 0.95
             this.drawRect4OnePoint(
               this.layer,
               col,
               row,
               this.drawInterval,
-              "#fb5a52"
+              "#fb5a52",
+              0.5
+            );
+          } else if (z < 0) {
+            this.drawRect4OnePoint(
+              this.layer,
+              col,
+              row,
+              this.drawInterval,
+              "#fb5a52",
+              0.4
+            );
+          } else if (z < 3) {
+            this.drawRect4OnePoint(
+              this.layer,
+              col,
+              row,
+              this.drawInterval,
+              "#32b900",
+              0.4
             );
           } else {
             this.drawRect4OnePoint(
@@ -291,14 +316,15 @@ export default {
               col,
               row,
               this.drawInterval,
-              "#32b900"
+              "#32b900",
+              0.5
             );
           }
         }
       }
       this.layer.draw();
     },
-    drawRect4OnePoint(layer, x1, x2, drawInterval, color) {
+    drawRect4OnePoint(layer, x1, x2, drawInterval, color, opacity) {
       // 以 x1、x2 为矩形的重心来画
       var rect = new Konva.Rect({
         x: x1 - 0.5 * drawInterval,
@@ -306,7 +332,7 @@ export default {
         width: drawInterval,
         height: drawInterval,
         fill: color,
-        opacity: 0.35
+        opacity: opacity
       });
       rect.cache();
       layer.add(rect);
@@ -601,13 +627,13 @@ export default {
     }
   }
 
-  .myfig {
-    .myfigure {
-      margin: 20px auto 100px;
-      padding-top: 10px;
-      border-top: 1px solid #ccc;
-    }
+  // .myfig {
+  .myfigure {
+    margin: 20px auto 100px;
+    padding-top: 10px;
+    border-top: 1px solid #ccc;
   }
+  // }
 }
 </style>
 

@@ -9,19 +9,34 @@
         讲解方式：
             以视频为主，轻松有趣。
 
-      
+
+        <div>
+            <input type="button" value="button">
+        </div>
+      <chart class="ch"></chart>
         
     </div>
 </template>
 
 <script>
+import Chart from "../components/Chart.vue";
 export default {
   name: "tutorial",
   data() {
     return {};
+  },
+  components: {
+    chart: Chart
   }
 };
 </script>
 
 <style lang="scss" scoped>
+.tutorial {
+  .ch {
+    margin: 50px;
+    width: 500px;
+    height: 300px;
+  }
+}
 </style>

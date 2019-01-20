@@ -6,13 +6,13 @@ a.push([[4], [5], [6]]);
 a.push([[7], [8], [9]]);
 // console.log("a:", a);
 var ma = math.matrix(a);
-// console.log("ma:", ma);
+console.log("ma:", ma);
 // var ma1 = math.matrix(ma);
 // console.log("ma1:", ma1);
 
-var size0 = ma.size()[0];
-var size1 = ma.size()[1];
-var size2 = ma.size()[2];
+// var size0 = ma.size()[0];
+// var size1 = ma.size()[1];
+// var size2 = ma.size()[2];
 // console.log("ma.size():", ma.size());
 console.log("math.range(0,0):", math.range(0, 0));
 

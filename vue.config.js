@@ -1,3 +1,4 @@
 module.exports = {
-  baseUrl: "./"
+  baseUrl: "./",
+  transpileDependencies: ["vue-echarts", "resize-detector"]
 };
