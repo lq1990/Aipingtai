@@ -29,20 +29,29 @@ export default {
   methods: {
     handleFigure() {
       this.newCanvas();
-      this.plot(this.logWval, 100);
+      this.plot(this.logWval, 2);
     },
     plot(W, interval) {
       var x, w0, w1, w2;
       for (var i = 0; i < W.length; i += interval) {
-        var cost = this.calcOneCost(W[i]);
-        console.log("cost:", cost);
+        // var cost = this.calcOneCost(W[i]);
+        // var costi = this.costArr[i];
+        // var circle = new Konva.Circle({
+        //   x: x / 1,
+        //   y: costi * 500 + this.height / 2,
+        //   radius: 2,
+        //   fill: "#000"
+        // });
+        // circle.cache();
+        // this.layer.add(circle);
+        // console.log("cost:", cost);
         x = i;
         w0 = W[i][0][0];
         w1 = W[i][1][0];
         w2 = W[i][2][0];
         // console.log(x, w0, w1, w2);
         var circle = new Konva.Circle({
-          x: x / 10,
+          x: x / 1,
           y: w0 * 10 + this.height / 2,
           radius: 2,
           fill: "#f00"
@@ -50,7 +59,7 @@ export default {
         circle.cache();
         this.layer.add(circle);
         circle = new Konva.Circle({
-          x: x / 10,
+          x: x / 1,
           y: w1 * 10 + this.height / 2,
           radius: 2,
           fill: "#0f0"
@@ -59,7 +68,7 @@ export default {
         this.layer.add(circle);
 
         circle = new Konva.Circle({
-          x: x / 10,
+          x: x / 1,
           y: w2 * 10 + this.height / 2,
           radius: 2,
           fill: "#00f"

@@ -300,9 +300,9 @@ Common.prototype = {
  * @returns 输出：当前迭代步对应的 W
  *
  * 优化器 涉及到：
- * 1. Gradient Descent 标准梯度下降法
- * 2. RMSProp
- * 3. Adadelta
+ * 0. Gradient Descent 标准梯度下降法
+ * 1. RMSProp
+ * 2. Adadelta
  */
 function Optimizer() {
   this.pho = 0.9; // 表示梯度下降的动力
@@ -317,61 +317,127 @@ Optimizer.prototype = {
    * @param {*} gt gradient of 当前步, 格式：math.matrix
    * @returns 经过当前步 改进后的W，格式：math.matrix
    */
-  gradientDescent: function(oldW, stepSize, gt) {
+  GradientDescent: function(oldW, stepSize, gt) {
     var W = math.subtract(oldW, math.multiply(stepSize, gt));
     // var newW = curW - stepSize * gt;
     return W;
   },
   /**
+   * 公式：
+   * dwt = - alpha  /  RMS[ g ]_ t  * gt
+   *
    * rmsProp取前几个 gt，而非所有之前的gt。
    * @param {*} oldW 上一个W，格式：math.matrix
    * @param {*} stepSize 步长、学习率
    * @param {*} gt 当前这一步的 g，格式：math.matrix ，多行1列
    * @param {*} gt_1 前几步中的g的arr，不算当前这一个
+   * @returns W
    */
-  rmsProp: function(oldW, stepSize, gt, gt_1) {
-    // gt_1里面存储了之前所有的g。需要先裁剪
+  RMSProp: function(oldW, stepSize, gt, gt_1Arr) {
+    // gt_1Arr里面存储了之前所有的g，不算当前的。已经在LogReg中被裁剪了
 
     this.pho = 0.9;
     this.epsilon = 10 ** -8;
-    var len = oldW.size()[0];
     var W;
     // 最开始第一步时，gt_1Arr是空的，用标准梯度下降法.
-    if (gt_1.length == 0) {
-      W = this.gradientDescent(oldW, stepSize, gt);
+    if (gt_1Arr.length == 0) {
+      W = this.GradientDescent(oldW, stepSize, gt);
       return W;
     }
-    // console.log("math.dotPow(gt_1, 2): ", math.dotPow(gt_1, 2));
 
-    var g2t_1 = math.dotPow(math.matrix(gt_1), 2);
-    var g2t_1_reshape = math.reshape(g2t_1, [gt_1.length, len]); // reshape原因是：把三维的数组变成二维的。
+    var rms_gt = this.calcRMSgt(gt, gt_1Arr, this.pho, this.epsilon);
 
+    // var dxt = (-stepSize * gt) / rms_gt;
+    var dxt = math.dotDivide(math.multiply(-stepSize, gt), rms_gt);
+    // var W = oldW + dxt; W每次迭代变化的值是 dxt
+    W = math.add(oldW, dxt);
+    return W;
+  },
+  /**
+   * Adadelta 从 Adagrad, RMSProp 升级而来;
+   * Adadelta 不需要设置初始学习率，自适应;
+   *
+   *公式：
+   * dwt = - RMS[ dx ]_ t-1  /  RMS[ g ]_ t  * gt
+   *
+   * @param oldW 格式：3行1列
+   * @param dxArr 格式：多个3行1列
+   */
+  Adadelta: function(oldW, stepSize, gt, gt_1Arr, dxArr) {
+    this.pho = 0.9;
+    this.epsilon = 10 ** -8;
+    // 最开始的第1，2步，dxArr 还不够多，是不能直接运行 Adadelta。需借助于 进行前两步。
+
+    if (gt_1Arr.length == 0) {
+      W = this.GradientDescent(oldW, stepSize, gt);
+      var dW01 = math.subtract(W, oldW);
+      return { W: W, dW: dW01 };
+    }
+    if (gt_1Arr.length == 1) {
+      W = this.RMSProp(oldW, stepSize, gt, gt_1Arr);
+      dW01 = math.subtract(W, oldW);
+      return { W: W, dW: dW01 };
+    }
+
+    var rms_gt = this.calcRMSgt(gt, gt_1Arr, this.pho, this.epsilon);
+
+    var dxArrnew = math.matrix(dxArr);
+    var size0 = dxArrnew.size()[0];
+    var size1 = dxArrnew.size()[1];
+    var size2 = dxArrnew.size()[2];
+
+    var curdx_temp = dxArrnew.subset(
+      math.index(size0 - 1, math.range(0, size1), math.range(0, size2))
+    );
+    var curdx = math.matrix(curdx_temp.valueOf()[0]);
+
+    var boforedxArr_temp = dxArrnew.subset(
+      math.index(
+        math.range(0, size0 - 1),
+        math.range(0, size1),
+        math.range(0, size2)
+      )
+    );
+
+    var beforedxArr = boforedxArr_temp.valueOf();
+    var rms_dxt_1 = this.calcRMSgt(curdx, beforedxArr, this.pho, this.epsilon);
+
+    var dxt_num = math.multiply(-1, math.dotMultiply(rms_dxt_1, gt));
+    var dxt_den = rms_gt;
+    var dxt = math.dotDivide(dxt_num, dxt_den);
+    var W = math.add(oldW, dxt);
+    return { W: W, dW: dxt };
+  },
+  /**
+   * 计算RMS为 rmsProp, adadelta 服务。
+   * 1. E[ g^2 ]_ t = pho * E[ g^2 ]_ (t-1) + (1-pho)*(g_t)^2
+   * 2. RMS[ g ]_t = sqrt( E[ g^2 ]_t + epsilon )
+   * @param {*} curGt 当前这一步的 gradient dCdW。格式：math.matrix
+   * @param {*} beforeGArr 格式：多个3行1列，不是math.matrix格式
+   * @param {*} pho 动力 0.9
+   * @param {*} epsilon 最小值 1e-8, 防止分母为0
+   */
+  calcRMSgt: function(curGt, beforeGArr, pho, epsilon) {
+    var len = curGt.size()[0];
+    // 因为 math.matrix格式的原因，gt_1Arr内数据格式：多个 3行1列。
+    // 为了计算 E[g^2]_(t-1) 的值，求 pow、mean elemetwise。就要借助于 reshape
+    var g2t_1 = math.dotPow(math.matrix(beforeGArr), 2);
+    var g2t_1_reshape = math.reshape(g2t_1, [beforeGArr.length, len]); // reshape原因是：把三维的数组变成二维的。
     var E_g2t_1_old = math.mean(g2t_1_reshape, 0);
-
     var E_g2t_1 = math.reshape(E_g2t_1_old, [len, 1]); // 前几个 g的平方的平均值（不算当前gt）。结果 3行1列
     // console.log("E_g2t_1:", E_g2t_1);
 
-    var g2t = math.dotPow(gt, 2); // 当前gt的平方。 结果 3行1列
+    var g2t = math.dotPow(curGt, 2); // 当前gt的平方。 结果 3行1列
     // console.log("g2t:", g2t);
     // console.log("this.pho:", this.pho);
     // var E_g2t = this.pho * E_g2t_1 + (1 - this.pho) * g2t;
     var E_g2t = math.add(
-      math.dotMultiply(this.pho, E_g2t_1),
-      math.dotMultiply(math.subtract(1, this.pho), g2t)
+      math.dotMultiply(pho, E_g2t_1),
+      math.dotMultiply(math.subtract(1, pho), g2t)
     );
-    var rms_gt = math.sqrt(math.add(E_g2t, this.epsilon));
-    // var dxt = (-stepSize * gt) / rms_gt;
-    var dxt = math.dotDivide(math.multiply(-stepSize, gt), rms_gt);
-    // var W = oldW + dxt;
-    W = math.add(oldW, dxt);
-    return W;
-  },
-
-  /**
-   * Adadelta 从 Adagrad, RMSProp 升级而来;
-   * Adadelta 不需要设置初始学习率，自适应;
-   */
-  adadelta: function() {}
+    var rms_gt = math.sqrt(math.add(E_g2t, epsilon));
+    return rms_gt;
+  }
 };
 // ========================================================================
 // =========================== LogReg =====================================
@@ -383,7 +449,7 @@ Optimizer.prototype = {
  * 3. inputClean(),
  * 4. featureEngineering(),
  * 5. featureScaling( 1 as default | 2 ),
- * 6. modelTrainCV( stepSize, stepTotal, isLogW ),
+ * 6. modelTrainCV(),
  * 7. modelTest(),
  * 8. visulization()
  */
@@ -400,52 +466,71 @@ for (var j in Optimizer.prototype) {
 
 /**
  *
- * @param {*} stepSize 0.01 as default
- * @param {*} stepTotal 1000 as default
- * @param {*} optimizer 优化算法的选择. 0: gd as default, 1: rmsProp
+ * @param {*} stepSize 0.1 as default
+ * @param {*} stepTotal 100 as default
+ * @param {*} optimizer 优化算法的选择. 0: GD as default, 1: RMSProp, 2: Adadelta
  * @param {*} isLogW 是否记录每一步的模型参数W，false as default
+ * @param gxLen 使用 RMSProp, Adadelta算法时，需要存储之前多少个gradient,dW
  */
 LogReg.prototype.modelTrainCV = function(
   stepSize,
   stepTotal,
   optimizer,
-  isLogW
+  isLogW,
+  gxLen
 ) {
-  this.optimizer = optimizer || "gd";
+  this.stepSize = stepSize || 0.1;
+  this.stepTotal = stepTotal || 100;
+  this.optimizer = optimizer || "GD";
+  this.isLogW = isLogW || false;
+  this.gxLen = gxLen || 100;
   var X = this.inputX;
   var Y = this.inputY;
-  this.stepSize = stepSize || 0.01;
-  this.stepTotal = stepTotal || 1000;
-  this.isLogW = isLogW || false;
   // 初始化
   var W = math.ones(X.size()[1], 1); // 针对逻辑回归二分类问题
   var XT = math.transpose(X);
   this.logWval = [W.valueOf()]; // 记录W的变化，从初始值开始记录
   // 迭代优化求W
   var dCdWArr = []; // 记录每一步的 dCdW 即gt.
+  var dWArr = []; // 记录 dW，为 Adadelta用。
   for (var i = 0; i < this.stepTotal; i++) {
     var Z = math.multiply(X, W); // Z = XW
 
     var H = this.sigmoid(Z);
     var HminusY = math.subtract(H, Y);
-    var dCdW = math.multiply(XT, HminusY);
+    var dCdW = math.multiply(XT, HminusY); // 不同ML算法得到的 dCdW 不同。
+    // console.log("dCdW:", dCdW);
 
-    if (optimizer == "gd" || optimizer == 0) {
+    if (optimizer == "GD" || optimizer == 0) {
       // 使用传统的梯度下降法, W -= alpha * dCdW
       // W = math.subtract(W, math.multiply(this.stepSize, dCdW));
-      W = this.gradientDescent(W, this.stepSize, dCdW);
-    } else if (optimizer == "rmsProp" || optimizer == 1) {
+      W = this.GradientDescent(W, this.stepSize, dCdW);
+    } else if (optimizer == "RMSProp" || optimizer == 1) {
       // RMSProp
-      W = this.rmsProp(W, this.stepSize, dCdW, dCdWArr); // 多行1列
+      W = this.RMSProp(W, this.stepSize, dCdW, dCdWArr); // 多行1列
       dCdWArr.push(dCdW.valueOf());
 
       // dCdW不需要存储所有值钱的梯度，只用前几个。
-      while (dCdWArr.length > 100) {
+      while (dCdWArr.length > this.gxLen) {
         dCdWArr.shift();
       }
+    } else if (optimizer == "Adadelta" || optimizer == 2) {
+      var obj = this.Adadelta(W, this.stepSize, dCdW, dCdWArr, dWArr);
+      W = obj.W;
+      var dW = obj.dW;
+
+      dCdWArr.push(dCdW.valueOf());
+      while (dCdWArr.length > this.gxLen) {
+        dCdWArr.shift();
+      }
+
+      dWArr.push(dW.valueOf());
+      while (dWArr.length > this.gxLen) {
+        dWArr.shift();
+      }
     }
-    // console.log("i: " + i + ", dCdWArr.length: " + dCdWArr.length);
     if (this.isLogW) {
+      // console.log("i: " + i + ", dCdWArr.length: " + dCdWArr.length);
       // 记录每一步
       this.logWval.push(W.valueOf());
     }
@@ -525,21 +610,21 @@ LogReg.prototype.calcCostArr = function() {
   return costArr;
 };
 
-LogReg.prototype.calcOneCost = function(w) {
-  var Z, H;
-  var X = this.inputX;
-  var Y = this.inputY;
-  var left, right, temp1, temp2, cost;
-  Z = math.multiply(X, w);
-  H = this.sigmoid(Z);
-  left = math.dotMultiply(math.multiply(-1, Y), math.log(H));
-  // right = -(1-Y)*log(1-H)
-  temp1 = math.subtract(Y, 1);
-  temp2 = math.log(math.subtract(1, H));
-  right = math.dotMultiply(temp1, temp2);
-  cost = math.add(left, right);
-  return cost;
-};
+// LogReg.prototype.calcOneCost = function(w) {
+//   var Z, H;
+//   var X = this.inputX;
+//   var Y = this.inputY;
+//   var left, right, temp1, temp2, cost;
+//   Z = math.multiply(X, w);
+//   H = this.sigmoid(Z);
+//   left = math.dotMultiply(math.multiply(-1, Y), math.log(H));
+//   // right = -(1-Y)*log(1-H)
+//   temp1 = math.subtract(Y, 1);
+//   temp2 = math.log(math.subtract(1, H));
+//   right = math.dotMultiply(temp1, temp2);
+//   cost = math.add(left, right);
+//   return cost;
+// };
 
 // ========================================================================
 // =========================== NN =========================================

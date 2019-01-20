@@ -1,4 +1,4 @@
-const math = require("mathjs");
+// const math = require("mathjs");
 // require("./LogReg"); 进来的是一个json对象，而不是直接的 LogReg
 // es5 语法
 const { ML } = require("./ML");
@@ -28,8 +28,9 @@ var res = lr
   .inputTrainRaw(inp)
   .inputCS2Mat()
   .featureScaling(1)
-  .modelTrainCV(0.1, 100, "rmsProp", true);
-//   .modelTrainCV(0.1, 100, "gd", true);
+  // .modelTrainCV(2, 10, "GD", true);
+  // .modelTrainCV(2, 10, "RMSProp", true, 100);
+  .modelTrainCV(2, 10, "Adadelta", true, 100);
 
 // var res = lr.inputRaw(inp).inputNew();
 // console.log("res:", res);

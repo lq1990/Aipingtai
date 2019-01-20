@@ -72,7 +72,7 @@
     </div>
 
     <div class="myfig">
-      <myfigure class="myfigure" :log-wval="logWval" :width="width" :height="height*2/3"></myfigure>
+      <myfigure class="myfigure" :cost-arr="costArr" :log-wval="logWval" :width="width" :height="height*2/3"></myfigure>
     </div>
   </div>
 </template>
@@ -135,7 +135,8 @@ export default {
       stage: null,
       colorTypeArr: [0], // 此为协助colorTypeStore用的数组
       currentAlg: "LogReg",
-      logWval: [] // 存储了模型参数 W 对应每一步的值. Array, [第i步][第j个w][0]
+      logWval: [], // 存储了模型参数 W 对应每一步的值. Array, [第i步][第j个w][0]
+      costArr: null
     };
   },
   methods: {
@@ -254,9 +255,17 @@ export default {
         .inputTrainRaw(this.listPointsPosType)
         .inputCS2Mat()
         .featureScaling()
-        .modelTrainCV(0.1, 100, "rmsProp", true);
-      console.log(res);
+        // .modelTrainCV(1, 100, "GD", true);
+        .modelTrainCV(1, 100, "RMSProp", true, 10);
+      // .modelTrainCV(1, 100, "Adadelta", true, 10);
+
+      // 注意：在画分界线阶段，就把cost计算了不好。在Figure阶段再计算cost。===========================
+      var costArr = lr.calcCostArr(res.logWval); // cost格式： [,,,]
+      console.log("costArr:", costArr);
+      // this.costArr = costArr;
+
       this.logWval = res.logWval;
+      // console.log("this.logWval:", this.logWval);
       var optW = res.optW;
       var minVec = res.inputXScaleMinVec.valueOf();
       var maxVec = res.inputXScaleMaxVec.valueOf();

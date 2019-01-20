@@ -4,15 +4,30 @@ var a = [[[0], [0], [0]]];
 a.push([[1], [2], [3]]);
 a.push([[4], [5], [6]]);
 a.push([[7], [8], [9]]);
-console.log("a:", a);
+// console.log("a:", a);
 var ma = math.matrix(a);
-console.log("ma:", ma);
-// var res = math.reshape(ma, [3, 3]);
-ma.reshape([a.length, 3]);
-// console.log("res:", res);
-console.log("ma:", ma);
-var mean_ma = math.mean(ma, 0).reshape([3, 1]);
-console.log("mean_ma:", mean_ma);
+// console.log("ma:", ma);
+// var ma1 = math.matrix(ma);
+// console.log("ma1:", ma1);
+
+var size0 = ma.size()[0];
+var size1 = ma.size()[1];
+var size2 = ma.size()[2];
+// console.log("ma.size():", ma.size());
+console.log("math.range(0,0):", math.range(0, 0));
+
+// var res = ma.subset(
+//   math.index(math.range(0, 0), math.range(0, size1), math.range(0, size2))
+// );
+// console.log("res.size():", res.size());
+// console.log("res:", res.valueOf());
+// console.log("ma:", ma);
+// // var res = math.reshape(ma, [3, 3]);
+// ma.reshape([a.length, 3]);
+// // console.log("res:", res);
+// console.log("ma:", ma);
+// var mean_ma = math.mean(ma, 0).reshape([3, 1]);
+// console.log("mean_ma:", mean_ma);
 // var x = [
 //   [1, 2],
 //   [2, 3],
