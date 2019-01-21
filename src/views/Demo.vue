@@ -1,56 +1,46 @@
 <template>
   <div class="demo">
-   
-    <p style="text-align:center;">
-      展示游乐场
-      左侧：画布
-      右侧上：模型选择
-      右侧下：模型参数
-      右侧底：训练 按钮
-    </p>
+    <!-- 不能把container同时放在两个 大小布局里，因为id是唯一的。
+    这样的话，只能把container从大小布局抽离。 或者使用 v-if 惰性加载-->
+    <div v-if="isLargeScreen" class="demo-large">
+      <div class="demo-large-left">
+        <div id="container"></div>
+        <div class="btn-wrap">
+          <div style="display: flex; justify-content: center; margin: 15px 0;">
+            <el-button type="danger" @click="handleRun" :style="{width: width/3+'px'}">运行</el-button>
+            <el-button type="danger" @click="handleParams">参数</el-button>
+          </div>
 
-    <div id="container"></div>
+          <div class="btn-point">
+            <input
+              type="button"
+              value="添加一点"
+              @mousedown="statusAdd = true"
+              :class="{showBtnBorder: statusAdd}"
+              :style="{ 
+            backgroundColor: currentColor
+            }"
+            >
+            <input
+              type="button"
+              value="移除某点"
+              @mousedown="statusAdd = false"
+              :class="{showBtnBorder: !statusAdd}"
+            >
+            <input type="button" value="清空所有" @mousedown="handleClearAll">
+            <input type="button" value="所有点信息" @mousedown="showAllDataInfo">
+          </div>
+          <div class="btn-add-del-color-type">
+            <input type="button" @mousedown="addColorType" value="添加点类型">
+            <input type="button" @mousedown="delColorType" value="删除点类型">
+          </div>
 
-    <div style="display: flex; justify-content: center; margin: 15px 0;">
-      <!-- <el-tooltip effect="dark"  content="运行一小会！" placement="left"> -->
-      <el-button type="danger" @click="handleRun" :style="{width: width/3+'px'}">运行</el-button>
-      <!-- </el-tooltip> -->
-      <el-button type="danger" @click="handleParams">参数</el-button>
-
-      <!-- <input class="btnRun" type="button" value="运行" @click="handleRun"> -->
-    </div>
-
-    <div class="btn-wrap">
-      <!-- PC、移动端区别对待点击事件。
-      PC: click (== tap of Mobile),
-      Mobile: touchstart (==mousedown of PC)-->
-      <div class="btn-point">
-        <input
-          type="button"
-          value="添加一点"
-          @mousedown="statusAdd = true"
-          :class="{showBtnBorder: statusAdd}"
-        >
-        <input
-          type="button"
-          value="移除某点"
-          @mousedown="statusAdd = false"
-          :class="{showBtnBorder: !statusAdd}"
-        >
-        <input type="button" value="清空所有" @mousedown="handleClearAll">
-        <input type="button" value="所有点信息" @mousedown="showAllDataInfo">
-      </div>
-      <div class="btn-add-del-color-type">
-        <input type="button" @mousedown="addColorType" value="添加点类型">
-        <input type="button" @mousedown="delColorType" value="删除点类型">
-      </div>
-
-      <div class="color-type">
-        <!-- 此处实现点击添加点类型按钮来 动态往页面添加元素 -->
-        <div
-          v-for="(item, index) in colorTypeArr"
-          :key="index"
-          :style="{backgroundColor: colorTypeStore[index], 
+          <div class="color-type">
+            <!-- 此处实现点击添加点类型按钮来 动态往页面添加元素 -->
+            <div
+              v-for="(item, index) in colorTypeArr"
+              :key="index"
+              :style="{backgroundColor: colorTypeStore[index], 
             width: '25px', 
             height: '25px',
             cursor: 'pointer',
@@ -58,20 +48,85 @@
             borderStyle: 'solid',
             borderColor: colorTypeStore[index]
             }"
-          @mousedown="changeColorType(index)"
-        ></div>
+              @mousedown="changeColorType(index)"
+            ></div>
+          </div>
+        </div>
       </div>
+
+      <demo-model class="demo-model"></demo-model>
     </div>
 
-    <!-- <myfigure class="myfigure" :cost-arr="costArr" :log-wval="logWval" :width="width" :height="height*2/3"></myfigure> -->
+    <div v-else class="demo-small">
+      <div id="container"></div>
+      <!-- 不能把container同时放在两个 大小布局里，因为id是唯一的。
+      这样的话，只能把container从大小布局抽离-->
+      <div class="btn-wrap">
+        <div style="display: flex; justify-content: center; margin: 15px 0;">
+          <el-button type="danger" @click="handleRun" :style="{width: width/3+'px'}">运行</el-button>
+          <el-button type="danger" @click="handleParams">参数</el-button>
+        </div>
+
+        <div class="btn-point">
+          <input
+            type="button"
+            value="添加一点"
+            @mousedown="statusAdd = true"
+            :class="{showBtnBorder: statusAdd}"
+            :style="{ 
+            backgroundColor: currentColor
+            }"
+          >
+          <input
+            type="button"
+            value="移除某点"
+            @mousedown="statusAdd = false"
+            :class="{showBtnBorder: !statusAdd}"
+          >
+          <input type="button" value="清空所有" @mousedown="handleClearAll">
+          <input type="button" value="所有点信息" @mousedown="showAllDataInfo">
+        </div>
+        <div class="btn-add-del-color-type">
+          <input type="button" @mousedown="addColorType" value="添加点类型">
+          <input type="button" @mousedown="delColorType" value="删除点类型">
+        </div>
+
+        <div class="color-type">
+          <!-- 此处实现点击添加点类型按钮来 动态往页面添加元素 -->
+          <div
+            v-for="(item, index) in colorTypeArr"
+            :key="index"
+            :style="{backgroundColor: colorTypeStore[index], 
+            width: '25px', 
+            height: '25px',
+            cursor: 'pointer',
+            borderWidth: showWidthStore[index],
+            borderStyle: 'solid',
+            borderColor: colorTypeStore[index]
+            }"
+            @mousedown="changeColorType(index)"
+          ></div>
+        </div>
+      </div>
+
+      <demo-model class="demo-model"></demo-model>
+    </div>
+
+    <!-- chart 不在 大小布局里 -->
     <div class="chart-wrap">
       <div class="btnChart">
         <!-- 当点击按钮时，再计算 cost值，把cost画出来。 -->
         <el-button class="btn" type="danger" @click="handleChart">Chart On/Off</el-button>
       </div>
-      <chart v-if="isShowChart" class="mychart" :cost-arr="costArr" :log-wval="logWval" :style="{width: width+'px', height:height*2/3+'px'}"></chart>
+      <chart
+        v-if="isShowChart"
+        class="mychart"
+        :cost-arr="costArr"
+        :log-wval="logWval"
+        :style="{width: width+'px', height:height*2/3+'px'}"
+      ></chart>
       <!-- v-if为惰性加载，当点击 chart按钮时，costArr先计算，然后再加载 chart组件。
-      就可以实现画图了 -->
+      就可以实现画图了-->
     </div>
   </div>
 </template>
@@ -84,24 +139,37 @@ const width = Math.min(iWidth, iHeight);
 const height = width;
 console.log("width:", width);
 console.log("height:", height);
+
+let isLarge = false;
+if (window.innerWidth >= 992) {
+  // 992 是 md 的界限，不同于以768为界。
+  // 经过个人尝试后，感觉以992为界更方便操作。
+  isLarge = true;
+}
 // 画布上的每个点所包含的的信息：坐标，样式
 import Konva from "konva";
 import * as math from "mathjs";
 import ML from "../lib/ML.js";
-// import Figure from "../components/Figure.vue";
 import Chart from "../components/Chart.vue";
+import DemoModel from "../components/DemoModel.vue";
+import { mapState, mapMutations } from "vuex";
 export default {
   name: "demo",
   components: {
-    chart: Chart
+    chart: Chart,
+    "demo-model": DemoModel
+  },
+  computed: {
+    ...mapState("demo", ["curAlg"])
   },
   data() {
     return {
+      isLargeScreen: isLarge,
       isShowChart: false,
       drawInterval: 20,
       // 对画布上的点进行分类后，用rect绘图时的间距，若间距为1则会延长计算渲染时长
-      width: width,
-      height: height,
+      width: width, // 画布的宽
+      height: height, // 画布的高
       statusAdd: true, // 点增加、移除
       currentColor: "#fb5a52",
       showWidthStore: [
@@ -135,7 +203,7 @@ export default {
       layer: null,
       stage: null,
       colorTypeArr: [0], // 此为协助colorTypeStore用的数组
-      currentAlg: "LogReg",
+      // currentAlg: "逻辑回归",
       currentOptimizer: "",
       logWval: [], // 存储了模型参数 W 对应每一步的值. Array, 多个 3行1列 [第i步][第j个w][0]
       inputX: [], // 画布上点数据对应的 Features, 格式: math.matrix
@@ -361,12 +429,12 @@ export default {
       layer.add(rect);
     },
     showAllDataInfo() {
-      console.log("当前使用的算法：", this.currentAlg);
+      console.log("当前使用的算法：", this.curAlg);
       console.log("所有点数据: ", this.listPointsPosType);
     },
     changeColorType(index) {
       this.currentColor = this.colorTypeStore[index];
-      this.drawStageBorder();
+      // this.drawStageBorder();
       this.showWidthStore = [
         "0px",
         "0px",
@@ -386,7 +454,7 @@ export default {
      */
     numOfClass(alg) {
       switch (alg) {
-        case "LogReg":
+        case "逻辑回归":
           return 2;
 
         default:
@@ -394,7 +462,7 @@ export default {
       }
     },
     addColorType() {
-      if (this.colorTypeArr.length < this.numOfClass(this.currentAlg)) {
+      if (this.colorTypeArr.length < this.numOfClass(this.curAlg)) {
         this.colorTypeArr.push(1);
       }
     },
@@ -415,8 +483,8 @@ export default {
         y: 0,
         width: stage.width(),
         height: stage.height(),
-        fill: "white",
-        stroke: this.currentColor
+        fill: "white"
+        // stroke: this.currentColor
       });
       layer.add(rect);
       layer.draw();
@@ -531,7 +599,7 @@ export default {
         this.clearStage(this.stage, this.layer);
 
         this.drawPointsFromList(this.layer, this.listPointsPosType);
-        this.drawStageBorder();
+        // this.drawStageBorder();
         this.saveListInStorage();
       });
     },
@@ -548,11 +616,12 @@ export default {
         strokeWidth: 5
       });
       var stage_border = new Konva.Rect({
-        x: 0,
-        y: 0,
-        width: this.width,
-        height: this.height,
-        stroke: this.currentColor
+        x: 0 + 1,
+        y: 0 + 1,
+        width: this.width - 2,
+        height: this.height - 2,
+        stroke: this.currentColor,
+        strokeWidth: 2
       });
 
       this.layer.add(before_draw, stage_border);
@@ -575,7 +644,7 @@ export default {
       this.stage.add(this.layer);
 
       // canvas边框给颜色，currentColor，这样在画点时就知道那个颜色在用了
-      this.drawStageBorder();
+      // this.drawStageBorder();
       // 在整个stage即canvas画布 上绑定点击事件
       // 点击事件触发后就会执行
       this.stageOnEvent("mousedown", this.pointRadius * 2);
@@ -597,30 +666,39 @@ export default {
     this.loadListFromStorage();
     this.initListPoints();
     this.newCanvas();
+
+    console.log("isLargeScreen: ", this.isLargeScreen);
+  },
+  watch: {
+    curAlg(val) {
+      // 监控 当前算法的变化，当切换到 逻辑回归时，只能做 2分类，所以只有2个颜色可用
+      // console.log("watch curAlg", val);
+      if (val == "逻辑回归") {
+        this.colorTypeArr = [0, 1]; // 当这个arr只有2个元素时
+      }
+    }
   }
 };
 </script>
 
 <style lang="scss" scoped>
 .demo {
-  // .btnRun {
-  //   background-color: #fb5a52;
-  //   border: 2px solid #fb5a52;
-  //   color: white;
-  //   width: 100px;
-  //   height: 30px;
-  //   margin: 0 10px;
-  // }
-  // .btnRun:hover,
-  // .btnRun:focus {
-  //   background-color: #fa736c;
-  //   border: 2px solid #fa736c;
-  // }
-  // .btnRun:active {
-  //   background-color: #fb0000;
-  //   border: 2px solid #fb0000;
-  // }
-
+  .demo-large {
+    display: flex;
+    justify-content: center;
+    .demo-large-left {
+      flex: 1 1 auto;
+    }
+    .demo-model {
+      flex: 2 1 auto;
+    }
+  }
+  .demo-model {
+    margin-top: 20px;
+  }
+  #container {
+    margin: 20px 10px 10px 10px;
+  }
   .btn-wrap {
     .btn-point {
       margin-top: 10px;
@@ -650,7 +728,6 @@ export default {
       }
     }
   }
-
   .chart-wrap {
     border-top: 1px solid #ccc;
     margin: 10px;
@@ -668,9 +745,12 @@ export default {
 </style>
 
 <style lang="css">
-div.konvajs-content {
+.konvajs-content {
   /* border: 1px solid #000 !important; */
   margin: 0 auto !important;
+}
+.konvajs-content canvas {
+  box-shadow: 0 0 15px 0 rgba(0, 0, 0, 0.4);
 }
 
 button.el-button.el-button--danger {

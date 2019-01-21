@@ -13,20 +13,20 @@
         <div>
             <input type="button" value="button">
         </div>
-      <chart class="ch"></chart>
+      <!-- <chart class="ch"></chart> -->
         
     </div>
 </template>
 
 <script>
-import Chart from "../components/Chart.vue";
+// import Chart from "../components/Chart.vue";
 export default {
   name: "tutorial",
   data() {
     return {};
   },
   components: {
-    chart: Chart
+    // chart: Chart
   }
 };
 </script>
