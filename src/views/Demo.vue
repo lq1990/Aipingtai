@@ -1,13 +1,6 @@
 <template>
   <div class="demo">
-    <!-- <el-row :gutter="0" type="flex" justify="space-around" class="main-body">
-      <el-col :span="6">
-        <div class>main-left</div>
-      </el-col>
-      <el-col :span="6">
-        <div class>main-right</div>
-      </el-col>
-    </el-row>-->
+   
     <p style="text-align:center;">
       展示游乐场
       左侧：画布
@@ -70,13 +63,16 @@
       </div>
     </div>
 
-    <!-- <div class="myfig"> -->
     <!-- <myfigure class="myfigure" :cost-arr="costArr" :log-wval="logWval" :width="width" :height="height*2/3"></myfigure> -->
-    <chart
-      class="myfigure"
-      :style="{width: width+'px', height:height*2/3+'px'}"
-    ></chart>
-    <!-- </div> -->
+    <div class="chart-wrap">
+      <div class="btnChart">
+        <!-- 当点击按钮时，再计算 cost值，把cost画出来。 -->
+        <el-button class="btn" type="danger" @click="handleChart">Chart On/Off</el-button>
+      </div>
+      <chart v-if="isShowChart" class="mychart" :cost-arr="costArr" :log-wval="logWval" :style="{width: width+'px', height:height*2/3+'px'}"></chart>
+      <!-- v-if为惰性加载，当点击 chart按钮时，costArr先计算，然后再加载 chart组件。
+      就可以实现画图了 -->
+    </div>
   </div>
 </template>
 
@@ -92,16 +88,16 @@ console.log("height:", height);
 import Konva from "konva";
 import * as math from "mathjs";
 import ML from "../lib/ML.js";
-import Figure from "../components/Figure.vue";
+// import Figure from "../components/Figure.vue";
 import Chart from "../components/Chart.vue";
 export default {
   name: "demo",
   components: {
-    // myfigure: Figure,
     chart: Chart
   },
   data() {
     return {
+      isShowChart: false,
       drawInterval: 20,
       // 对画布上的点进行分类后，用rect绘图时的间距，若间距为1则会延长计算渲染时长
       width: width,
@@ -140,11 +136,30 @@ export default {
       stage: null,
       colorTypeArr: [0], // 此为协助colorTypeStore用的数组
       currentAlg: "LogReg",
-      logWval: [], // 存储了模型参数 W 对应每一步的值. Array, [第i步][第j个w][0]
-      costArr: null
+      currentOptimizer: "",
+      logWval: [], // 存储了模型参数 W 对应每一步的值. Array, 多个 3行1列 [第i步][第j个w][0]
+      inputX: [], // 画布上点数据对应的 Features, 格式: math.matrix
+      inputY: [], // 画布上点数据对应的 Labels，格式：math.matrix
+      costArr: [] // 将每一步迭代对应的 cost值存储，格式：普通的 array [,,,...]
     };
   },
   methods: {
+    calcCostArr(Wval, X, Y) {
+      let lr = new ML.LogReg();
+      let costArr = lr.calcCostArr(Wval, X, Y);
+      return costArr;
+    },
+    /**
+     * 点击 Chart 按钮时，先计算costArr，再将其画出
+     */
+    handleChart() {
+      this.costArr = this.calcCostArr(this.logWval, this.inputX, this.inputY);
+      this.isShowChart = !this.isShowChart;
+      // console.log("this.costArr.length:", this.costArr.length);
+      // console.log("this.costArr:", this.costArr);
+      // console.log("this.inputX:", this.inputX);
+      // console.log("this.inputY:", this.inputY);
+    },
     handleParams() {
       console.log(this.logWval); // [][][] 1：第i步，2：第j个w， 3：为0
       // console.log(this.logWval[967][0][0]);
@@ -230,9 +245,11 @@ export default {
     handleRun(e) {
       console.log("run..., type: " + e.type);
       this.LogRegDrawColorArea();
+      console.log("after LogRegDraw");
 
       // 运行时，把list和logWval保存
       this.saveListInStorage();
+      console.log("after saveListInStorage");
     },
     handleRunTap() {
       console.log("run tap...");
@@ -254,23 +271,29 @@ export default {
       console.log("run Click...");
       // this.LogRegDrawColorArea();
     },
+
     LogRegDrawColorArea() {
       var lr = new ML.LogReg();
       var res = lr
         .inputTrainRaw(this.listPointsPosType)
         .inputCS2Mat()
         .featureScaling()
-        // .modelTrainCV(1, 100, "GD", true);
-        .modelTrainCV(1, 100, "RMSProp", true, 10);
+        .modelTrainCV(0.1, 100, "GD", true);
+      // .modelTrainCV(1, 100, "RMSProp", true, 10);
       // .modelTrainCV(1, 100, "Adadelta", true, 10);
 
+      this.logWval = res.logWval;
+      this.inputX = res.inputX;
+      this.inputY = res.inputY;
+
       // 注意：在画分界线阶段，就把cost计算了不好。在Figure阶段再计算cost。===========================
-      var costArr = lr.calcCostArr(res.logWval); // cost格式： [,,,]
-      console.log("costArr:", costArr);
+      // var costArr = lr.calcCostArr(res.logWval); // cost格式： [,,,]
+      // console.log("costArr:", costArr);
       // this.costArr = costArr;
 
-      this.logWval = res.logWval;
       // console.log("this.logWval:", this.logWval);
+
+      // 将画布着色，即泛华，将画布上每一个点输入到模型，得到结果后来判定类别。
       var optW = res.optW;
       var minVec = res.inputXScaleMinVec.valueOf();
       var maxVec = res.inputXScaleMaxVec.valueOf();
@@ -290,7 +313,7 @@ export default {
               row,
               this.drawInterval,
               "#fb5a52",
-              0.5
+              0.4
             );
           } else if (z < 0) {
             this.drawRect4OnePoint(
@@ -299,7 +322,7 @@ export default {
               row,
               this.drawInterval,
               "#fb5a52",
-              0.4
+              0.37
             );
           } else if (z < 3) {
             this.drawRect4OnePoint(
@@ -308,7 +331,7 @@ export default {
               row,
               this.drawInterval,
               "#32b900",
-              0.4
+              0.37
             );
           } else {
             this.drawRect4OnePoint(
@@ -317,7 +340,7 @@ export default {
               row,
               this.drawInterval,
               "#32b900",
-              0.5
+              0.4
             );
           }
         }
@@ -542,6 +565,7 @@ export default {
      *    可在舞台上点击画点，借助按钮实现移除某点，清空所有。
      */
     newCanvas() {
+      console.log("newCanvas");
       this.stage = new Konva.Stage({
         container: "container",
         width: this.width,
@@ -569,7 +593,7 @@ export default {
   },
   created() {},
   mounted() {
-    console.log("mounted...");
+    console.log("demo mounted...");
     this.loadListFromStorage();
     this.initListPoints();
     this.newCanvas();
@@ -579,23 +603,23 @@ export default {
 
 <style lang="scss" scoped>
 .demo {
-  .btnRun {
-    background-color: #fb5a52;
-    border: 2px solid #fb5a52;
-    color: white;
-    width: 100px;
-    height: 30px;
-    margin: 0 10px;
-  }
-  .btnRun:hover,
-  .btnRun:focus {
-    background-color: #fa736c;
-    border: 2px solid #fa736c;
-  }
-  .btnRun:active {
-    background-color: #fb0000;
-    border: 2px solid #fb0000;
-  }
+  // .btnRun {
+  //   background-color: #fb5a52;
+  //   border: 2px solid #fb5a52;
+  //   color: white;
+  //   width: 100px;
+  //   height: 30px;
+  //   margin: 0 10px;
+  // }
+  // .btnRun:hover,
+  // .btnRun:focus {
+  //   background-color: #fa736c;
+  //   border: 2px solid #fa736c;
+  // }
+  // .btnRun:active {
+  //   background-color: #fb0000;
+  //   border: 2px solid #fb0000;
+  // }
 
   .btn-wrap {
     .btn-point {
@@ -627,13 +651,19 @@ export default {
     }
   }
 
-  // .myfig {
-  .myfigure {
-    margin: 20px auto 100px;
-    padding-top: 10px;
+  .chart-wrap {
     border-top: 1px solid #ccc;
+    margin: 10px;
+    padding-top: 10px;
+    .btnChart {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .mychart {
+      margin: 0 auto;
+    }
   }
-  // }
 }
 </style>
 

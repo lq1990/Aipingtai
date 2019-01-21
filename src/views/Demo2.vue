@@ -1,5 +1,5 @@
 <template>
-  <div class="demo">
+  <div class="demo2">
     <!-- <el-row :gutter="0" type="flex" justify="space-around" class="main-body">
       <el-col :span="6">
         <div class>main-left</div>
@@ -33,7 +33,7 @@ console.log("width:", width);
 import Konva from "konva";
 
 export default {
-  name: "demo",
+  name: "demo2",
   data() {
     return {
       width,

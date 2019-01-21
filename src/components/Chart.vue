@@ -1,11 +1,6 @@
 <template>
   <div class="chart">
-    <div class="btnChart">
-        <!-- btnChart 不应放在这里，应该放在 父级，当点击按钮时，再计算cost 传给chart -->
-      <el-button class="btn" type="danger" @click="handleFigure">Chart</el-button>
-    </div>
-
-    <v-chart :options="lineData"></v-chart>
+    <v-chart :options="lineCost2"></v-chart>
   </div>
 </template>
 
@@ -15,48 +10,74 @@ import "echarts/lib/chart/line";
 import "echarts/lib/component/legend";
 export default {
   name: "chart",
-  props: ["plotx", "ploty"],
+  props: ["costArr", "logWval"],
   data() {
-    let data_lirun = [920, 932, 901, 934, 1290, 1330, 1320];
+    let plotX = [];
+    let plotY = [];
+    this.costArr.forEach((item, index) => {
+      plotX.push(index);
+      plotY.push(item);
+    });
+    let w0 = [];
+    let w1 = [];
+    let w2 = [];
+    for (let i = 0; i < this.logWval.length; i++) {
+      w0.push(this.logWval[i][0][0]);
+      w1.push(this.logWval[i][1][0]);
+      w2.push(this.logWval[i][2][0]);
+    }
     return {
-      lineData: {
+      lineCost2: {
         legend: {},
         xAxis: {
           type: "category",
-          data: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+          // category 必须。不能换成value，否则有问题
+          data: plotX
         },
         yAxis: {
           type: "value"
         },
         series: [
           {
-            name: "利润",
-            data: data_lirun,
-            type: "line",
-            label: {
-              normal: {
-                show: true
-              }
-            }
+            name: "cost",
+            data: plotY,
+            type: "line"
+            // label: {
+            //   normal: {
+            //     show: true
+            //   }
+            // }
           },
           {
-            name: "支出",
-            data: [1820, 1932, 1901, 1934, 2290, 2330, 2320],
+            name: "w0",
+            data: w0,
             type: "line"
           },
           {
-            name: "收入",
-            data: [80, 93, 90, 94, 290, 130, 320],
+            name: "w1",
+            data: w1,
+            type: "line"
+          },
+          {
+            name: "w2",
+            data: w2,
             type: "line"
           }
-        ],
-        animationDuration: 0
+        ]
       }
     };
   },
+  computed: {},
+  methods: {},
   components: {
     "v-chart": ECharts
-  }
+  },
+  mounted() {
+    console.log("Chart mounted...");
+    // console.log("this.costArr.length:", this.costArr.length);
+    // console.log("this.logWval:", this.logWval);
+  },
+  watch: {}
 };
 </script>
 

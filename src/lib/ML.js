@@ -582,13 +582,13 @@ LogReg.prototype.calcWdetails = function(aWval) {
  * wArr 输入，格式：多个 3行1列
  * @returns costArr, 格式：[ v1,v2, v3,... ]
  */
-LogReg.prototype.calcCostArr = function() {
-  var wArr = this.logWval;
+LogReg.prototype.calcCostArr = function(wArr, X, Y) {
+  // var wArr = this.logWval;
   var costArr = [],
     Z,
     H;
-  var X = this.inputX;
-  var Y = this.inputY;
+  // var X = this.inputX;
+  // var Y = this.inputY;
   var left, right, temp1, temp2, cost;
   for (var i = 0; i < wArr.length; i++) {
     Z = math.multiply(X, wArr[i]);
@@ -603,6 +603,7 @@ LogReg.prototype.calcCostArr = function() {
     // console.log("right:", right);
     cost = math.add(left, right); // cost此时时 多行1列
     var cost_mean = math.mean(cost);
+    // console.log("cost_mean:", cost_mean);
 
     costArr.push(cost_mean);
     // console.log("cost:", cost); // NaN
