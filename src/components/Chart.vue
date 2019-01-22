@@ -8,6 +8,7 @@
 import ECharts from "vue-echarts";
 import "echarts/lib/chart/line";
 import "echarts/lib/component/legend";
+import "echarts/lib/component/tooltip";
 export default {
   name: "chart",
   props: ["costArr", "logWval"],
@@ -29,6 +30,15 @@ export default {
     return {
       lineCost2: {
         legend: {},
+        tooltip: {
+          trigger: "axis",
+          axisPointer: {
+            type: "cross",
+            label: {
+              backgroundColor: "#ccc"
+            }
+          }
+        },
         xAxis: {
           type: "category",
           // category 必须。不能换成value，否则有问题

@@ -7,6 +7,7 @@
       trigger="click"
       type="card"
       height="100px"
+      :initial-index="curAlgIdx"
     >
       <el-carousel-item v-for="(item,index) in algArr" :key="index">
         <h3>{{item}}</h3>
@@ -35,33 +36,67 @@
                 <el-radio-button v-for="(item, index) in optimizerArr" :key="index" :label="item"></el-radio-button>
               </el-radio-group>
             </div>
-            <input type="button" value="显示参数" @click="handleParamsShow"> &nbsp;
-            <input type="button" value="重置" @click="handleParamsReset">
           </div>
+
           <div class="render">
             <h4>画布渲染：</h4>
-            <div style="text-align:center">
-              <div>省时、粗糙</div>
-
-              <div style="display: flex; justify-content:center;">
-                <el-slider v-model="drawInt" :min="1" :max="50" vertical height="100px"></el-slider>
+            <div>
+              <div style="text-align: right">省时 粗糙</div>
+              <div>
+                <el-slider v-model="drawInt" :min="1" :max="50"></el-slider>
               </div>
-              <div>精细、耗时</div>
+              <div>精细 耗时</div>
             </div>
           </div>
         </div>
+        <input type="button" value="显示参数" @click="handleParamsShow"> &nbsp;
+        <input type="button" value="重置" @click="handleParamsReset">
       </template>
+
       <template v-if="curAlg=='神经网络'">
-        <h4>参数：</h4>
-        <p>层数</p>
+        <div class="params-render">
+          <div class="params">
+            <h4>参数：</h4>
+            <div class="params-items">学习率：
+              <el-input size="mini" class="input" v-model="stepS"></el-input>
+            </div>
+            <div class="params-items">总步数：
+              <el-input size="mini" class="input" v-model="stepT"></el-input>
+            </div>
+            <div class="params-items">优化器：
+              <el-radio-group size="mini" v-model="curOpt" fill="#ff9f44">
+                <el-radio-button v-for="(item, index) in optimizerArr" :key="index" :label="item"></el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="params-items">惩罚系数</div>
+            <div class="params-items">结构一览</div>
+
+          </div>
+
+          <div class="render">
+            <h4>画布渲染：</h4>
+            <div>
+              <div style="text-align: right">省时 粗糙</div>
+              <div>
+                <el-slider v-model="drawInt" :min="1" :max="50"></el-slider>
+              </div>
+              <div>精细 耗时</div>
+            </div>
+          </div>
+        </div>
+        <input type="button" value="显示参数" @click="handleParamsShow"> &nbsp;
+        <input type="button" value="重置" @click="handleParamsReset">
       </template>
+
       <template v-if="curAlg=='线性回归'">
         <h4>参数：</h4>
         <p>惩罚系数</p>
       </template>
     </div>
 
-    <br>
+    <!-- div.bottom 存在的意义只是辅助 flex布局，避免上面两个 往下 -->
+    <div class="bottom"></div>
+
     <!-- curAlg in store: {{ curAlg }} -->
   </div>
 </template>
@@ -77,6 +112,7 @@ export default {
     ...mapState("demo", [
       "algArr",
       "curAlg",
+      "curAlgIdx",
       "stepSize",
       "stepTotal",
       "optimizerArr",
@@ -89,6 +125,7 @@ export default {
       },
       set(val) {
         this.changeStepSize(val);
+        this.saveParamsInStorage();
       }
     },
     stepT: {
@@ -97,6 +134,7 @@ export default {
       },
       set(val) {
         this.changeStepTotal(val);
+        this.saveParamsInStorage();
       }
     },
     curOpt: {
@@ -105,6 +143,7 @@ export default {
       },
       set(val) {
         this.changeCurOptimizer(val);
+        this.saveParamsInStorage();
       }
     },
     drawInt: {
@@ -113,21 +152,28 @@ export default {
       },
       set(val) {
         this.changeDrawInterval(val);
+        this.saveParamsInStorage();
       }
     }
   },
   methods: {
     ...mapMutations("demo", [
       "changeCurAlg",
-      "changeCurOptimizer",
+      "changeCurAlgIdx",
       "changeStepSize",
       "changeStepTotal",
+      "changeCurOptimizer",
       "changeDrawInterval"
     ]),
     handleCardChange(cur) {
       // (cur, old) 传入参数为 索引
       this.changeCurAlg(this.algArr[cur]);
+      this.changeCurAlgIdx(cur);
+
+      this.saveParamsInStorage();
+
       console.log("%cthis.curAlg:", "color:blue", this.curAlg);
+      console.log("%cthis.curAlgIdx:", "color:blue", this.curAlgIdx);
     },
     handleParamsShow() {
       console.log("this.stepSize:", this.stepSize);
@@ -140,16 +186,57 @@ export default {
       this.changeStepTotal(100);
       this.changeCurOptimizer("GD");
       this.changeDrawInterval(20);
+
+      this.saveParamsInStorage();
+    },
+    saveParamsInStorage() {
+      let paramsObj = {
+        curAlg: this.curAlg,
+        curAlgIdx: this.curAlgIdx,
+        stepSize: this.stepSize,
+        stepTotal: this.stepTotal,
+        curOptimizer: this.curOptimizer,
+        drawInterval: this.drawInterval
+      };
+      sessionStorage.setItem("paramsObj", JSON.stringify(paramsObj));
+      console.log("paramsObj:", paramsObj);
+    },
+    loadParamsFromStorage() {
+      const data = sessionStorage.getItem("paramsObj") || "{}";
+      const paramsObj = JSON.parse(data);
+      if (paramsObj.stepSize) {
+        this.changeStepSize(paramsObj.stepSize);
+      } else {
+        // 在最开始打开页面时，params为空，需要赋值
+        this.changeStepSize(0.1);
+      }
+
+      // 即使params为空， curAlg, curAlgIdx 也不是空，而是逻辑回归，0。不需要再设置了。
+      this.changeCurAlg(paramsObj.curAlg);
+      this.changeCurAlgIdx(paramsObj.curAlgIdx);
+
+      if (paramsObj.stepTotal) {
+        this.changeStepTotal(paramsObj.stepTotal);
+      } else {
+        this.changeStepTotal(100);
+      }
+      if (paramsObj.curOptimizer) {
+        this.changeCurOptimizer(paramsObj.curOptimizer);
+      } else {
+        this.changeCurOptimizer("GD");
+      }
+      if (paramsObj.drawInterval) {
+        this.changeDrawInterval(paramsObj.drawInterval);
+      } else {
+        this.changeDrawInterval(20);
+      }
     }
-    // handleOptimizerChange(e) {
-    //   console.log("e:", e);
-    //   console.log("%cthis.curOptimizer:", "color:red", this.curOptimizer);
-    //   console.log("this.curOpt:", this.curOpt);
-    // }
   },
   mounted() {
-    console.log("mounted...");
-    console.log("%cthis.curOptimizer:", "color:red", this.curOptimizer);
+    console.log("DemoModel mounted...");
+    // console.log("%cthis.curOptimizer:", "color:red", this.curOptimizer);
+    this.loadParamsFromStorage();
+    // 初次加载时，params为空
   }
 };
 </script>
@@ -164,14 +251,17 @@ export default {
     padding: 5px 0;
     border-top: 1px solid #ccc;
     border-bottom: 1px solid #ccc;
+    text-align: center;
   }
   .params-render {
     display: flex;
+    margin-bottom: 15px;
+    // justify-content: space-evenly;
     .params {
       flex: 1 1 60%;
       // border: 1px solid #f66;
       .params-items {
-        margin-bottom: 10px;
+        padding: 5px 0;
         .input {
           width: 100px;
           display: inline-block;

@@ -1,16 +1,20 @@
 export default {
   state: {
-    curAlg: "",
     algArr: ["逻辑回归", "神经网络", "线性回归"],
+    optimizerArr: ["GD", "RMSProp", "Adadelta"],
+    curAlg: "",
+    curAlgIdx: null, // 0,1,2 对应于 上面三个alg
     stepSize: 0.1,
     stepTotal: 100,
     curOptimizer: "GD",
-    optimizerArr: ["GD", "RMSProp", "Adadelta"],
     drawInterval: 20
   },
   mutations: {
     changeCurAlg(state, payload) {
       state.curAlg = payload;
+    },
+    changeCurAlgIdx(state, payload) {
+      state.curAlgIdx = payload;
     },
     changeCurOptimizer(state, payload) {
       state.curOptimizer = payload;

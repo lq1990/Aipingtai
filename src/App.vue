@@ -76,6 +76,7 @@ export default {
     color: #fff;
     align-items: center;
     font-size: 14px;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.3);
 
     .header-menu {
       display: flex;
@@ -96,6 +97,7 @@ export default {
     height: 48px;
     color: #fff;
     display: flex;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.3);
 
     .header-title {
       flex: 10 1 auto;

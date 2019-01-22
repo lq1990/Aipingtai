@@ -27,6 +27,7 @@
               @mousedown="statusAdd = false"
               :class="{showBtnBorder: !statusAdd}"
             >
+            <input type="button" value="清空颜色" @mousedown="handleClearColor">
             <input type="button" value="清空所有" @mousedown="handleClearAll">
             <input type="button" value="所有点信息" @mousedown="showAllDataInfo">
           </div>
@@ -83,6 +84,7 @@
             @mousedown="statusAdd = false"
             :class="{showBtnBorder: !statusAdd}"
           >
+          <input type="button" value="清空颜色" @mousedown="handleClearColor">
           <input type="button" value="清空所有" @mousedown="handleClearAll">
           <input type="button" value="所有点信息" @mousedown="showAllDataInfo">
         </div>
@@ -152,7 +154,7 @@ import * as math from "mathjs";
 import ML from "../lib/ML.js";
 import Chart from "../components/Chart.vue";
 import DemoModel from "../components/DemoModel.vue";
-import { mapState, mapMutations } from "vuex";
+import { mapState } from "vuex";
 export default {
   name: "demo",
   components: {
@@ -160,13 +162,19 @@ export default {
     "demo-model": DemoModel
   },
   computed: {
-    ...mapState("demo", ["curAlg"])
+    ...mapState("demo", [
+      "curAlg", // Demo中只读取 curAlg，实际的更改在 DemoModel.vue 里。
+      "stepSize",
+      "stepTotal",
+      "curOptimizer",
+      "drawInterval"
+    ])
   },
   data() {
     return {
       isLargeScreen: isLarge,
       isShowChart: false,
-      drawInterval: 20,
+      // drawInterval: 20,
       // 对画布上的点进行分类后，用rect绘图时的间距，若间距为1则会延长计算渲染时长
       width: width, // 画布的宽
       height: height, // 画布的高
@@ -212,6 +220,10 @@ export default {
     };
   },
   methods: {
+    handleClearColor() {
+      this.clearStage(this.stage, this.layer);
+      this.drawPointsFromList(this.layer, this.listPointsPosType);
+    },
     calcCostArr(Wval, X, Y) {
       let lr = new ML.LogReg();
       let costArr = lr.calcCostArr(Wval, X, Y);
@@ -292,7 +304,7 @@ export default {
         JSON.stringify(this.listPointsPosType)
       );
       // 为了避免刷新页面时，存储的模型参数 logWval 被清除
-      sessionStorage.setItem("params", JSON.stringify(this.logWval));
+      sessionStorage.setItem("Warr", JSON.stringify(this.logWval));
     },
     /**
      * 在 mounted 时，加载
@@ -301,8 +313,8 @@ export default {
       const data = sessionStorage.getItem("listPoints") || "[]";
       this.listPointsPosType = JSON.parse(data);
 
-      const params = sessionStorage.getItem("params") || "[]";
-      this.logWval = JSON.parse(params);
+      const Warr = sessionStorage.getItem("Warr") || "[]";
+      this.logWval = JSON.parse(Warr);
     },
     /**
      * 当点击清空所有时，sessionStorage 就会被清空
@@ -312,16 +324,29 @@ export default {
     },
     handleRun(e) {
       console.log("run..., type: " + e.type);
-      this.LogRegDrawColorArea();
-      console.log("after LogRegDraw");
+      console.log("%cthis.stepSize:", "color:#44d39f", this.stepSize);
+      console.log("%cthis.stepTotal:", "color:#44d39f", this.stepTotal);
+      console.log("%cthis.curOptimizer:", "color:#44d39f", this.curOptimizer);
+      console.log("%cthis.drawInterval:", "color:#44d39f", this.drawInterval);
+
+      // 选择ML算法
+      if (this.curAlg == "逻辑回归") {
+        console.log("当前运行的是：" + this.curAlg);
+        this.LogRegDrawColorArea(
+          this.stepSize,
+          this.stepTotal,
+          this.curOptimizer,
+          true // 记录 W，否则不能画 chart
+        );
+      } else {
+        alert("逻辑回归之外的算法还未写好。不能运行。");
+      }
 
       // 运行时，把list和logWval保存
       this.saveListInStorage();
-      console.log("after saveListInStorage");
     },
     handleRunTap() {
       console.log("run tap...");
-      // this.LogRegDrawColorArea();
     },
     handleRunTouchend() {
       console.log("run touchend...");
@@ -337,16 +362,21 @@ export default {
     },
     handleRunClick() {
       console.log("run Click...");
-      // this.LogRegDrawColorArea();
     },
 
-    LogRegDrawColorArea() {
+    /**
+     * @param ss stepSize
+     * @param st stepTotal
+     * @param opt optimizer
+     */
+    LogRegDrawColorArea(ss, st, opt, isLogW) {
       var lr = new ML.LogReg();
+
       var res = lr
         .inputTrainRaw(this.listPointsPosType)
         .inputCS2Mat()
         .featureScaling()
-        .modelTrainCV(0.1, 100, "GD", true);
+        .modelTrainCV(ss, st, opt, isLogW);
       // .modelTrainCV(1, 100, "RMSProp", true, 10);
       // .modelTrainCV(1, 100, "Adadelta", true, 10);
 
@@ -670,7 +700,7 @@ export default {
   },
   created() {},
   mounted() {
-    console.log("demo mounted...");
+    console.log("Demo mounted...");
     this.loadListFromStorage();
     this.initListPoints();
     this.newCanvas();
@@ -693,12 +723,13 @@ export default {
 .demo {
   .demo-large {
     display: flex;
-    justify-content: center;
+    // justify-content: space-around;
     .demo-large-left {
       flex: 1 1 auto;
     }
     .demo-model {
-      flex: 2 1 auto;
+      flex: 1 1 auto;
+      // margin-right: 10px;
     }
   }
   .demo-model {
@@ -759,6 +790,7 @@ export default {
 }
 .konvajs-content canvas {
   box-shadow: 0 0 15px 0 rgba(0, 0, 0, 0.4);
+  background: #fff !important;
 }
 
 button.el-button.el-button--danger {
