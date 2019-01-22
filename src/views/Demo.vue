@@ -366,8 +366,16 @@ export default {
       var minVec = res.inputXScaleMinVec.valueOf();
       var maxVec = res.inputXScaleMaxVec.valueOf();
 
-      for (var col = 0; col < this.width; col += this.drawInterval) {
-        for (var row = 0; row < this.height; row += this.drawInterval) {
+      for (
+        var col = 0;
+        col < this.width + this.drawInterval;
+        col += this.drawInterval
+      ) {
+        for (
+          var row = 0;
+          row < this.height + this.drawInterval;
+          row += this.drawInterval
+        ) {
           var colNew = (col - minVec[0][1]) / (maxVec[0][1] - minVec[0][1]);
           var rowNew = (row - minVec[0][2]) / (maxVec[0][2] - minVec[0][2]);
           // 对当前的点进行 scaling
@@ -697,7 +705,7 @@ export default {
     margin-top: 20px;
   }
   #container {
-    margin: 20px 10px 10px 10px;
+    margin: 20px 10px 10px 20px;
   }
   .btn-wrap {
     .btn-point {

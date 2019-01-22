@@ -5,7 +5,7 @@ import mutations from "./mutations";
 import actions from "./actions";
 import getters from "./getters";
 
-import Demo from "./Demo";
+import Demo from "./Demo"; // 从 ./Demo 文件夹中引入 子模块
 
 Vue.use(Vuex);
 
