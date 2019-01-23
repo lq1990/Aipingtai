@@ -171,11 +171,10 @@ export default {
       this.changeCurAlgIdx(cur);
 
       this.saveParamsInStorage();
-
-      console.log("%cthis.curAlg:", "color:blue", this.curAlg);
-      console.log("%cthis.curAlgIdx:", "color:blue", this.curAlgIdx);
     },
     handleParamsShow() {
+      console.log("%cthis.curAlg:", "color:blue", this.curAlg);
+      console.log("%cthis.curAlgIdx:", "color:blue", this.curAlgIdx);
       console.log("this.stepSize:", this.stepSize);
       console.log("this.stepTotal:", this.stepTotal);
       console.log("this.curOptimizer:", this.curOptimizer);
@@ -199,7 +198,7 @@ export default {
         drawInterval: this.drawInterval
       };
       sessionStorage.setItem("paramsObj", JSON.stringify(paramsObj));
-      console.log("paramsObj:", paramsObj);
+      // console.log("paramsObj:", paramsObj);
     },
     loadParamsFromStorage() {
       const data = sessionStorage.getItem("paramsObj") || "{}";
@@ -207,8 +206,8 @@ export default {
       if (paramsObj.stepSize) {
         this.changeStepSize(paramsObj.stepSize);
       } else {
-        // 在最开始打开页面时，params为空，需要赋值
-        this.changeStepSize(0.1);
+        // 在最开始打开页面时，params为空，需要赋值。否则会为空。
+        this.changeStepSize(this.stepSize);
       }
 
       // 即使params为空， curAlg, curAlgIdx 也不是空，而是逻辑回归，0。不需要再设置了。
@@ -218,22 +217,22 @@ export default {
       if (paramsObj.stepTotal) {
         this.changeStepTotal(paramsObj.stepTotal);
       } else {
-        this.changeStepTotal(100);
+        this.changeStepTotal(this.stepTotal);
       }
       if (paramsObj.curOptimizer) {
         this.changeCurOptimizer(paramsObj.curOptimizer);
       } else {
-        this.changeCurOptimizer("GD");
+        this.changeCurOptimizer(this.curOptimizer);
       }
       if (paramsObj.drawInterval) {
         this.changeDrawInterval(paramsObj.drawInterval);
       } else {
-        this.changeDrawInterval(20);
+        this.changeDrawInterval(this.drawInterval);
       }
     }
   },
   mounted() {
-    console.log("DemoModel mounted...");
+    console.log("%cDemoModel.vue mounted...", "color:red");
     // console.log("%cthis.curOptimizer:", "color:red", this.curOptimizer);
     this.loadParamsFromStorage();
     // 初次加载时，params为空

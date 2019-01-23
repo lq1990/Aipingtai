@@ -7,7 +7,7 @@ export default {
     stepSize: 0.1,
     stepTotal: 100,
     curOptimizer: "GD",
-    drawInterval: 20
+    drawInterval: 40
   },
   mutations: {
     changeCurAlg(state, payload) {

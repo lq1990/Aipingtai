@@ -18,7 +18,8 @@
               @mousedown="statusAdd = true"
               :class="{showBtnBorder: statusAdd}"
               :style="{ 
-            backgroundColor: currentColor
+            backgroundColor: currentColor,
+            
             }"
             >
             <input
@@ -316,12 +317,7 @@ export default {
       const Warr = sessionStorage.getItem("Warr") || "[]";
       this.logWval = JSON.parse(Warr);
     },
-    /**
-     * 当点击清空所有时，sessionStorage 就会被清空
-     */
-    clearStorage() {
-      sessionStorage.clear();
-    },
+
     handleRun(e) {
       console.log("run..., type: " + e.type);
       console.log("%cthis.stepSize:", "color:#44d39f", this.stepSize);
@@ -345,24 +341,6 @@ export default {
       // 运行时，把list和logWval保存
       this.saveListInStorage();
     },
-    handleRunTap() {
-      console.log("run tap...");
-    },
-    handleRunTouchend() {
-      console.log("run touchend...");
-    },
-    handleRunTouchstart() {
-      console.log("run touchstart...");
-    },
-    handleRunMousedown() {
-      console.log("run mousedown...");
-    },
-    handleRunMouseup() {
-      console.log("run mouseup...");
-    },
-    handleRunClick() {
-      console.log("run Click...");
-    },
 
     /**
      * @param ss stepSize
@@ -381,7 +359,7 @@ export default {
       // .modelTrainCV(1, 100, "Adadelta", true, 10);
 
       this.logWval = res.logWval;
-      this.inputX = res.inputX;
+      this.inputX = res.inputX; // 此处的inputx已经被 scaling。
       this.inputY = res.inputY;
 
       // 注意：在画分界线阶段，就把cost计算了不好。在Figure阶段再计算cost。===========================
@@ -391,7 +369,7 @@ export default {
 
       // console.log("this.logWval:", this.logWval);
 
-      // 将画布着色，即泛华，将画布上每一个点输入到模型，得到结果后来判定类别。
+      // 将画布着色，即泛化，将画布上每一个点输入到模型，得到结果后来判定类别。勿忘对testdata scaling
       var optW = res.optW;
       var minVec = res.inputXScaleMinVec.valueOf();
       var maxVec = res.inputXScaleMaxVec.valueOf();
@@ -471,8 +449,8 @@ export default {
       console.log("所有点数据: ", this.listPointsPosType);
     },
     changeColorType(index) {
+      // 切换到点击的颜色
       this.currentColor = this.colorTypeStore[index];
-      // this.drawStageBorder();
       this.showWidthStore = [
         "0px",
         "0px",
@@ -568,7 +546,7 @@ export default {
     handleClearAll() {
       this.listPointsPosType = [];
       this.clearStage(this.stage, this.layer);
-      this.clearStorage();
+      sessionStorage.removeItem("listPoints");
     },
     /**
      * 10种颜色对应10类
@@ -609,6 +587,7 @@ export default {
      */
     stageOnEvent(event, removeDisThreshold) {
       this.stage.on(event, () => {
+        // console.log("%ce.type:", "color:red", e.type);
         const Pos = this.stage.getPointerPosition();
         const x = Math.round(Pos.x);
         const y = Math.round(Pos.y);
@@ -621,6 +600,17 @@ export default {
             color: this.currentColor,
             type: type
           });
+
+          // 在添加状态，只画最后加进list的 点
+          var circle = new Konva.Circle({
+            x: x,
+            y: y,
+            radius: this.pointRadius,
+            fill: this.currentColor
+          });
+          circle.cache();
+          this.layer.add(circle);
+          this.layer.draw();
         } else {
           // 在移除状态时，点击位置附近较近的一个点会被移除
           this.listPointsPosType.forEach((item, index) => {
@@ -631,40 +621,17 @@ export default {
               this.listPointsPosType.splice(index, 1);
             }
           });
+          // 在移除状态，每点击一次，要 先清空画布，再重画剩下所有的点。
+          // 画之前清空画布
+          this.clearStage(this.stage, this.layer);
+          this.drawPointsFromList(this.layer, this.listPointsPosType);
         }
 
-        // 画之前清空画布
-        this.clearStage(this.stage, this.layer);
-
-        this.drawPointsFromList(this.layer, this.listPointsPosType);
-        // this.drawStageBorder();
+        // 最终无论是 添加、移除点，都把 点list 存储到 sessionSto。
         this.saveListInStorage();
       });
     },
-    /**
-     * 画舞台边框。改变画笔颜色时，边框会变成相应颜色。以提示用户
-     */
-    drawStageBorder() {
-      var before_draw = new Konva.Rect({
-        x: 0,
-        y: 0,
-        width: this.width,
-        height: this.height,
-        stroke: "#fff",
-        strokeWidth: 5
-      });
-      var stage_border = new Konva.Rect({
-        x: 0 + 1,
-        y: 0 + 1,
-        width: this.width - 2,
-        height: this.height - 2,
-        stroke: this.currentColor,
-        strokeWidth: 2
-      });
 
-      this.layer.add(before_draw, stage_border);
-      this.layer.draw();
-    },
     /**
      * 新建canvas
      *
@@ -682,7 +649,6 @@ export default {
       this.stage.add(this.layer);
 
       // canvas边框给颜色，currentColor，这样在画点时就知道那个颜色在用了
-      // this.drawStageBorder();
       // 在整个stage即canvas画布 上绑定点击事件
       // 点击事件触发后就会执行
       this.stageOnEvent("mousedown", this.pointRadius * 2);
@@ -700,7 +666,7 @@ export default {
   },
   created() {},
   mounted() {
-    console.log("Demo mounted...");
+    console.log("%cDemo.vue mounted...", "color:red");
     this.loadListFromStorage();
     this.initListPoints();
     this.newCanvas();

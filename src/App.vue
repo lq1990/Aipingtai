@@ -62,7 +62,9 @@ export default {
     return {};
   },
   methods: {},
-  mounted() {},
+  mounted() {
+    console.log("%cApp.vue mounted...", "color:red");
+  },
   components: {},
   watch: {}
 };

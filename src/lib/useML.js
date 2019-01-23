@@ -29,13 +29,13 @@ var res = lr
   .inputCS2Mat()
   .featureScaling(1)
   // .modelTrainCV(2, 10, "GD", true);
-  // .modelTrainCV(2, 10, "RMSProp", true, 100);
-  .modelTrainCV(2, 10, "Adadelta", true, 100);
+  // .modelTrainCV(2, 10, "RMSProp", true);
+  .modelTrainCV(2, 10, "Adadelta", true);
 
 // var res = lr.inputRaw(inp).inputNew();
 // console.log("res:", res);
 // console.log("res.logWval:", res.logWval);
-var cost = lr.calcCostArr(res.logWval);
+var cost = lr.calcCostArr(res.logWval, res.inputX, res.inputY); // 计算cost是针对 scaling之后的inputx而言的。
 console.log("cost:", cost);
 
 // lr.inputNew();
