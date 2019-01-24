@@ -1,12 +1,21 @@
 const math = require("mathjs");
 
-var a = [[[0], [0], [0]]];
-a.push([[1], [2], [3]]);
-a.push([[4], [5], [6]]);
-a.push([[7], [8], [9]]);
+// var res = math.ones(4, 3);
+// console.log("res:", res);
+
+var a = [[1, 2, 3]];
+a.push([4, 5, 6]);
+a.push([7, 8, 9]);
+a.push([11, 22, 33]);
 // console.log("a:", a);
-var ma = math.matrix(a);
-console.log("ma:", ma);
+// var ma = math.matrix(a);
+// console.log("ma:", ma);
+// console.log("res:", res);
+
+var res = math.random([3, 2], -1, 1);
+console.log("res:", res, typeof res);
+// var res = math.sum(ma, 1);
+// console.log("res:", res);
 // var ma1 = math.matrix(ma);
 // console.log("ma1:", ma1);
 
@@ -14,7 +23,7 @@ console.log("ma:", ma);
 // var size1 = ma.size()[1];
 // var size2 = ma.size()[2];
 // console.log("ma.size():", ma.size());
-console.log("math.range(0,0):", math.range(0, 0));
+// console.log("math.range(0,0):", math.range(0, 0));
 
 // var res = ma.subset(
 //   math.index(math.range(0, 0), math.range(0, size1), math.range(0, size2))

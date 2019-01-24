@@ -7,7 +7,8 @@ const math = require("mathjs");
 
 var ML = {
   Common: Common,
-  LogReg: LogReg
+  LogReg: LogReg,
+  NN: NN
 };
 
 // ========================================================================
@@ -49,7 +50,7 @@ Common.prototype = {
    * 将canvas过来的数据inputTrainRaw转成 矩阵格式的 inputX, inputY
    *
    * inputX: Features, inputX会被不断改造，直到最终输入给model，格式
-   * inputY: Labels
+   * inputY: Labels, 多行1列
    */
   inputCS2Mat: function() {
     var { X, Y } = this.canvas2MLmat(this.inputTrainRaw);
@@ -57,6 +58,62 @@ Common.prototype = {
     this.inputY = Y;
     return this;
   },
+  /**
+   * 为了多分类问题，使用 onehot.
+   * 将canvas过来的数据转成 矩阵格式的inputX, onehot类型的 inputY
+   * inputX 被改为：第一列都是1，剩下2列是 Features
+   * inputY 多行 3列，如果是3分类问题的话，onehot格式
+   */
+  inputCS2MatXOneHotY: function() {
+    var { X, Y } = this.canvas2MLmatOneHot(this.inputTrainRaw);
+    this.inputX = X;
+    this.inputY = Y;
+    return this;
+  },
+  /**
+   * 输入：canvas过来的数据，
+   * 输入格式：[ {pos: [x, y], type:"A | B | ...", color: "", classes: }, {},...]
+   * 输出 inputX 多行2列，不同于 逻辑回归的 多行3列。
+   * 输出 inputY 多行3列（3类的话） 都是 math.matrix格式
+   * @param {*} inputTrainRaw
+   */
+  canvas2MLmatOneHot: function(inputTrainRaw) {
+    var classes = inputTrainRaw[inputTrainRaw.length - 1].classes;
+
+    var xArr = [];
+    var yArr = [];
+    inputTrainRaw.forEach(item => {
+      var pos = item.pos;
+      xArr.push(pos);
+
+      var type0 = this.labelOfType(item.type); // 输出为 [0],[1],[2],...
+      var type = type0[0]; // 0,1,2,3,...
+      var zeros = this.zerosOne(classes, type);
+      yArr.push(zeros);
+    });
+
+    var X = math.matrix(xArr);
+    var Y = math.matrix(yArr);
+    return { X: X, Y: Y };
+  },
+
+  /**
+   * 生成onehot辅助函数
+   * @param {*} classes 类别总数
+   * @param {*} idx 第idx号位是1，剩下位置为0
+   */
+  zerosOne: function(classes, idx) {
+    var zeros = [];
+    for (let i = 0; i < classes; i++) {
+      if (i != idx) {
+        zeros.push(0);
+      } else {
+        zeros.push(1);
+      }
+    }
+    return zeros;
+  },
+
   inputClean: function() {
     return this;
   },
@@ -69,7 +126,7 @@ Common.prototype = {
    * 1. (data-min)/(max-min)，对应 inputXScaleMinVec, inputXScaleMaxVec;
    * 2. (data-mean)/std, 对应 inputXScaleMeanVec, inputXScaleStdVec;
    *
-   * Vec格式：[a,b,c,...]
+   * Vec格式：[ a,b,c,...]
    * @param scaleType 1、2
    */
   featureScaling: function(type) {
@@ -111,10 +168,19 @@ Common.prototype = {
    * @param {*} num 扩充到多少列、行
    */
   extendArr: function(inp, dir, num) {
-    var arrNew = inp.clone();
-    while (arrNew.size()[0] < num) {
-      arrNew = math.concat(arrNew, inp, dir);
+    var arrNew;
+    if (dir == 0) {
+      arrNew = inp.clone();
+      while (arrNew.size()[0] < num) {
+        arrNew = math.concat(arrNew, inp, 0);
+      }
+    } else {
+      arrNew = inp.clone();
+      while (arrNew.size()[1] < num) {
+        arrNew = math.concat(arrNew, inp);
+      }
     }
+
     return arrNew;
   },
   /**
@@ -122,7 +188,7 @@ Common.prototype = {
    * 自己写的，按照列方向求标准差。
    * @param {*} inp math.matrix 格式，多行多列
    * @param {*} dir 0: 列方向
-   * @returns math vector 当为列方向时，输出为 一行的向量 [a,b,...]
+   * @returns math vector 当为列方向时，输出为 一行的向量 [ a,b,...]
    */
   myStd: function(inp, dir) {
     var direc = dir || 0;
@@ -223,7 +289,7 @@ Common.prototype = {
   sigmoid: function(inpZ) {
     // 输出h = 1 / (1 + Math.E ** -输入z)
     var num = 1;
-    var expMinusZ = math.dotPow(Math.E, math.multiply(-1, inpZ));
+    var expMinusZ = math.dotPow(Math.E, math.dotMultiply(-1, inpZ));
     var den = math.add(1, expMinusZ); // 加减可以直接进行 elementwise。但乘除必须用dot。
     var out = math.dotDivide(num, den);
     return out;
@@ -257,6 +323,7 @@ Common.prototype = {
         return null;
     }
   },
+
   /**
    * 输入：canvas过来的数据，格式：[ {pos: [x, 1], type:"", color: ""}, {},...]
    *
@@ -273,8 +340,8 @@ Common.prototype = {
     // ...
     // ]
     // out: ML模型(针对逻辑回归)需要的输入数据格式为:
-    // X: [[1,x1,x2],[1,x1,x2],[1,x1,x2],...]
-    // Y: [[0 | 1],[0 | 1],[],...]
+    // X: math.matrix, [[1,x1,x2],[1,x1,x2],[1,x1,x2],...]
+    // Y: math.matrix, [[0 | 1],[0 | 1],[],...]
     var X0 = new Array();
     var Y0 = new Array();
     canvasData.forEach(item => {
@@ -631,7 +698,7 @@ LogReg.prototype.calcOneCost = function(w, X, Y) {
 /**
  * 流程如下：
  * 1. inputTrainRaw( inp ),
- * 2. inputCS2Mat(),
+ * 2. inputCS2MatXOneHotY()
  * 3. inputClean(),
  * 4. featureEngineering(),
  * 5. featureScaling( 1 as default | 2 ),
@@ -650,82 +717,191 @@ for (let j in Optimizer.prototype) {
   NN.prototype[j] = Optimizer.prototype[j];
 }
 
+NN.prototype.softmax = function(inpZ) {
+  var cols = inpZ.size()[1];
+  // 首先，对Z中元素预处理：每一个元素都减去所在行的max，防止exp后溢出。
+  var maxCurRow = math.max(inpZ, 1);
+  var maxCurRow_reshape = math.reshape(maxCurRow, [maxCurRow.size()[0], 1]);
+  var maxCurRow_reshape_clone = this.extendArr(maxCurRow_reshape, 1, cols); // inp, dir, num
+  // console.log("inpZ: ", inpZ);
+  // console.log("maxCurRow_reshape_clone:", maxCurRow_reshape_clone);
+  var inpZ_shift = math.subtract(inpZ, maxCurRow_reshape_clone);
+  // 先对Z每一个元素 exp(z)
+  // 再 expZ 中每一个元素都除以 所在行的sum
+  var expZ = math.exp(inpZ_shift);
+  var expZSum = math.sum(expZ, 1);
+  var expZSum_reshape = math.reshape(expZSum, [expZSum.size()[0], 1]);
+  var expZSumExtend = this.extendArr(expZSum_reshape, 1, cols);
+  var outZ = math.dotDivide(expZ, expZSumExtend);
+  return outZ;
+};
+
+/**
+ * NN解决多分类问题。
+ * 输入到此的数据格式：
+ * inputX: 被scaling后的。
+ * inputY：onehot
+ * @param layerList 存储NN每一层的信息 [ 输入Features个数，L1层神经元数目，L2层，，，输出层元数即分类数]
+ */
 NN.prototype.modelTrainCV = function(
+  layerList,
   stepSize,
   stepTotal,
   optimizer,
+  lambda,
   isLogW,
   gxLen
 ) {
+  this.layerList = layerList; // 包含 输入层、所有隐层、输出层, [numOfFeatures, m1,m2,..., numOfClass]
+  // 注意list存储的每一层的神经元个数，但不包括 bias元。
+  var len_layerList = this.layerList.length; // 隐层数目为 len - 2
+  // var numOfFeatures = this.layerList[0];
+  // var numOfClass = this.layerList[len_layerList - 1];
+
   this.stepSize = stepSize || 0.1;
   this.stepTotal = stepTotal || 100;
   this.optimizer = optimizer || "GD";
-  this.isLogW = isLogW || false;
+  this.lambda = lambda || 0.01; // 惩罚项的系数
+  this.isLogW = isLogW || true;
   this.gxLen = gxLen || 100;
-  var X = this.inputX;
-  var Y = this.inputY;
-  // 初始化
-  var W = math.ones(X.size()[1], 1); // 针对逻辑回归二分类问题
+
+  var X = this.inputX; // 多行2列，因为只有2个Features
   var XT = math.transpose(X);
-  this.logWval = [W.valueOf()]; // 记录W的变化，从初始值开始记录
-  // 迭代优化求W
-  var dCdWArr = []; // 记录每一步的 dCdW 即gt.
-  var dWArr = []; // 记录 dW，为 Adadelta用。
-  for (var i = 0; i < this.stepTotal; i++) {
-    var Z = math.multiply(X, W); // Z = XW
+  var Y = this.inputY; // 多行3列（若3类的话）
 
-    var H = this.sigmoid(Z);
-    var HminusY = math.subtract(H, Y);
-    var dCdW = math.multiply(XT, HminusY); // 不同ML算法得到的 dCdW 不同。
-    // console.log("dCdW:", dCdW);
-
-    if (optimizer == "GD" || optimizer == 0) {
-      // 使用传统的梯度下降法, W -= alpha * dCdW
-      // W = math.subtract(W, math.multiply(this.stepSize, dCdW));
-      W = this.GradientDescent(W, this.stepSize, dCdW);
-    } else if (optimizer == "RMSProp" || optimizer == 1) {
-      // RMSProp
-      W = this.RMSProp(W, this.stepSize, dCdW, dCdWArr); // 多行1列
-      dCdWArr.push(dCdW.valueOf());
-
-      // dCdW不需要存储所有值钱的梯度，只用前几个。
-      while (dCdWArr.length > this.gxLen) {
-        dCdWArr.shift();
-      }
-    } else if (optimizer == "Adadelta" || optimizer == 2) {
-      var obj = this.Adadelta(W, this.stepSize, dCdW, dCdWArr, dWArr);
-      W = obj.W;
-      var dW = obj.dW;
-
-      dCdWArr.push(dCdW.valueOf());
-      while (dCdWArr.length > this.gxLen) {
-        dCdWArr.shift();
-      }
-
-      dWArr.push(dW.valueOf());
-      while (dWArr.length > this.gxLen) {
-        dWArr.shift();
-      }
-    }
-    if (this.isLogW) {
-      // console.log("i: " + i + ", dCdWArr.length: " + dCdWArr.length);
-      // 记录每一步
-      this.logWval.push(W.valueOf());
-    }
+  // 初始化 W,b
+  var W = []; // 用 W 存储所有的w, [empty, [], [],...]
+  var b = []; // 用 b 存储所有的b, [empty, [], [],...]
+  for (let i = 1; i < len_layerList; i++) {
+    // 层数从 0开始计数，L0, L1, L2。
+    W[i] = math.random([layerList[i - 1], layerList[i]], -1, 1);
+    b[i] = math.random([X.size()[0], layerList[i]], -1, 1); // b的维度：n行多列，n为样本数目
   }
-  this.optW = W;
-  this.optWval = W.valueOf();
-  this.optWdetails = this.calcWdetails(this.optWval);
+
+  for (let i = 0; i < this.stepTotal; i++) {
+    // ================= 前向传播 ====================
+    // 输入为 X
+
+    // L1
+    // var Z1 = X * W[1] + b[1]; // (n,4)
+    var Z1 = math.add(math.multiply(X, W[1]), b[1]); // (n,4)
+    var A1 = this.sigmoid(Z1); // (n,4)
+    // console.log("A1:", A1);
+
+    // L2
+    // var Z2 = A1 * W[2] + b[2];
+    var Z2 = math.add(math.multiply(A1, W[2]), b[2]); // (n,3)
+    var A2 = this.softmax(Z2); // (n,3)
+    // softmax输出为概率
+    // console.log("A2:", A2);
+
+    // ================== 反向传播 =========================
+    var A1T = math.transpose(A1);
+    // var delta2 = A2i - 1; // 注意此处是 label对应类处 才减一。 比如 [a,b-1,c] 第二类为label类，则只在第二类 减一。
+    // ============== 此处很策略。 先减1，在和label elementwise 乘。 充分发挥label onehot矩阵用处。====================
+    var delta2 = math.dotMultiply(Y, math.subtract(A2, 1)); // (n,3)
+
+    // var dW2 = A1T * delta2 + lambda * W[2];
+    var dW2 = math.add(
+      math.multiply(A1T, delta2),
+      math.dotMultiply(this.lambda, W[2])
+    ); // (4,3)
+    var db2 = delta2; // (n,3)
+
+    // var delta1 = delta2 * W2T .* ( sz1*(1-sz1) );
+    var delta1_left = math.multiply(delta2, math.transpose(W[2])); // (n,3)(3,4)=(n,4)
+    var sigmoid_Z1 = this.sigmoid(Z1); // (n,4)
+    var delta1_right = math.dotMultiply(
+      sigmoid_Z1,
+      math.subtract(1, sigmoid_Z1)
+    ); // (n,4)
+    var delta1 = math.dotMultiply(delta1_left, delta1_right); // (n,4)
+    // var dW1 = XT * delta1 + lambda * W[1];
+    var dW1 = math.add(
+      math.multiply(XT, delta1), // (2,n)(n,4)=(2,4)
+      math.multiply(this.lambda, W[1]) // (2,4)
+    ); // (2,4)
+    var db1 = delta1; // (n,4)
+    // console.log("dW2:", dW1);
+    // console.log("db2:", db1);
+
+    // ============== 更新 W，b ==================
+    // W -= this.stepSize * dW
+    W[2] = math.subtract(W[2], math.multiply(this.stepSize, dW2));
+    b[2] = math.subtract(b[2], math.multiply(this.stepSize, db2));
+    W[1] = math.subtract(W[1], math.multiply(this.stepSize, dW1));
+    b[1] = math.subtract(b[1], math.multiply(this.stepSize, db1));
+  }
+  // console.log("W[2]:", W[2]);
+  // console.log("b[2]:", b[2]);
+  // console.log("W[1]:", W[1]);
+  // console.log("b[1]:", b[1]);
+
+  // 计算下在这个 W，b，所得模型的输出
+  console.log("A2:", A2);
+
+  this.W = W;
+  this.b = b;
+  // this.logWval = [W.valueOf()]; // 记录W的变化，从初始值开始记录
+  // // 迭代优化求W
+  // var dCdWArr = []; // 记录每一步的 dCdW 即gt.
+  // var dWArr = []; // 记录 dW，为 Adadelta用。
+  // for (var i = 0; i < this.stepTotal; i++) {
+  //   var Z = math.multiply(X, W); // Z = XW
+
+  //   var H = this.sigmoid(Z);
+  //   var HminusY = math.subtract(H, Y);
+  //   var dCdW = math.multiply(XT, HminusY); // 不同ML算法得到的 dCdW 不同。
+  //   // console.log("dCdW:", dCdW);
+
+  //   if (optimizer == "GD" || optimizer == 0) {
+  //     // 使用传统的梯度下降法, W -= alpha * dCdW
+  //     // W = math.subtract(W, math.multiply(this.stepSize, dCdW));
+  //     W = this.GradientDescent(W, this.stepSize, dCdW);
+  //   } else if (optimizer == "RMSProp" || optimizer == 1) {
+  //     // RMSProp
+  //     W = this.RMSProp(W, this.stepSize, dCdW, dCdWArr); // 多行1列
+  //     dCdWArr.push(dCdW.valueOf());
+
+  //     // dCdW不需要存储所有值钱的梯度，只用前几个。
+  //     while (dCdWArr.length > this.gxLen) {
+  //       dCdWArr.shift();
+  //     }
+  //   } else if (optimizer == "Adadelta" || optimizer == 2) {
+  //     var obj = this.Adadelta(W, this.stepSize, dCdW, dCdWArr, dWArr);
+  //     W = obj.W;
+  //     var dW = obj.dW;
+
+  //     dCdWArr.push(dCdW.valueOf());
+  //     while (dCdWArr.length > this.gxLen) {
+  //       dCdWArr.shift();
+  //     }
+
+  //     dWArr.push(dW.valueOf());
+  //     while (dWArr.length > this.gxLen) {
+  //       dWArr.shift();
+  //     }
+  //   }
+  //   if (this.isLogW) {
+  //     // console.log("i: " + i + ", dCdWArr.length: " + dCdWArr.length);
+  //     // 记录每一步
+  //     this.logWval.push(W.valueOf());
+  //   }
+  // }
+  // this.optW = W;
+  // this.optWval = W.valueOf();
+  // this.optWdetails = this.calcWdetails(this.optWval);
   return this;
 };
+
 // ========================================================================
 // ========================== 导出 ========================================
 // ========================================================================
 // es5写法：导出一个模块对象。 是一个json对象。
 // 在其他文件使用时，也是import进了json对象
-// module.exports = {
-// ML: ML
-// };
+module.exports = {
+  ML: ML
+};
 
 // es6
-export default ML;
+// export default ML;

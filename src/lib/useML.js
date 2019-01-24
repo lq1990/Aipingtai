@@ -1,4 +1,4 @@
-// const math = require("mathjs");
+const math = require("mathjs");
 // require("./LogReg"); 进来的是一个json对象，而不是直接的 LogReg
 // es5 语法
 const { ML } = require("./ML");
@@ -7,6 +7,7 @@ const { ML } = require("./ML");
 // import ML from "./ML";
 
 var inp = [
+  { pos: [50, 50], type: "C", color: "" },
   { pos: [1, 2], type: "A", color: "" },
   { pos: [2, 3], type: "A", color: "" },
   { pos: [4, 2], type: "A", color: "" },
@@ -19,24 +20,38 @@ var inp = [
   { pos: [88, 88], type: "B", color: "" },
   { pos: [99, 99], type: "B", color: "" },
   { pos: [70, 70], type: "B", color: "" },
-  { pos: [59, 100], type: "B", color: "" },
-  { pos: [60, 100], type: "B", color: "" }
+  { pos: [59, 59], type: "C", color: "" },
+  { pos: [59, 69], type: "C", color: "" },
+  { pos: [69, 59], type: "C", color: "" },
+  { pos: [60, 100], type: "B", color: "", classes: 3 }
 ];
-var lr = new ML.LogReg();
-// // 链式调用的核心是 return this;
-var res = lr
+
+var nn = new ML.NN();
+// var layerList = [2, 4, 2];
+var res = nn
   .inputTrainRaw(inp)
-  .inputCS2Mat()
-  .featureScaling(1)
-  // .modelTrainCV(2, 10, "GD", true);
-  // .modelTrainCV(2, 10, "RMSProp", true);
-  .modelTrainCV(2, 10, "Adadelta", true);
+  .inputCS2MatXOneHotY()
+  .featureScaling()
+  .modelTrainCV([2, 3, 3], 0.1, 100, "GD", 1);
+
+// var s1 = nn.softmax(res.inputX);
+// console.log("res:", res);
+// console.log("s1:", s1);
+// var lr = new ML.LogReg();
+// 链式调用的核心是 return this;
+// var res = lr
+// .inputTrainRaw(inp)
+// .inputCS2Mat()
+// .featureScaling(1)
+// .modelTrainCV(2, 10, "GD", true);
+// .modelTrainCV(2, 10, "RMSProp", true);
+// .modelTrainCV(2, 10, "Adadelta", true);
 
 // var res = lr.inputRaw(inp).inputNew();
 // console.log("res:", res);
 // console.log("res.logWval:", res.logWval);
-var cost = lr.calcCostArr(res.logWval, res.inputX, res.inputY); // 计算cost是针对 scaling之后的inputx而言的。
-console.log("cost:", cost);
+// var cost = lr.calcCostArr(res.logWval, res.inputX, res.inputY); // 计算cost是针对 scaling之后的inputx而言的。
+// console.log("cost:", cost);
 
 // lr.inputNew();
 // lr.featureScaling();

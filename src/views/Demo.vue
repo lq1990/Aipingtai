@@ -181,6 +181,7 @@ export default {
       height: height, // 画布的高
       statusAdd: true, // 点增加、移除
       currentColor: "#fb5a52",
+      usedColor: new Set(["#fb5a52", "#32b900"]), // 颜色的数目 代表 数据的类别数目
       showWidthStore: [
         "2px",
         "0px",
@@ -206,8 +207,9 @@ export default {
         "#313e41"
       ], // 10种颜色
       // listPoints: [], // 存储点击的 点位置和点类别(不同类别对应颜色、样式不同)信息 [[x,y],[x,y],...]// 记录10种点类型(颜色、点形状)。为 后续 ML分为10类做准备
-      listPointsPosType: [], // 存储了点的信息 [{pos:[x,1], color: ""}, {},...]
-      // 有了点的信息 ，可以进一步用ML做分类、回归、聚类
+      listPointsPosType: [], // 存储了点的信息 [{pos:[x,1], color: "", classes: }, {},...]
+      // 有了点的信息 ，可以进一步用ML做分类、回归、聚类。
+      // 由于往list中push数据，为了得到 数据点的类别数目，直接查看list最后一个数据的classes
       pointRadius: 3, // 点击时，画布上圆半径
       layer: null,
       stage: null,
@@ -255,42 +257,50 @@ export default {
         {
           pos: [this.width / 8, (this.height * 2) / 3],
           color: "#fb5a52",
-          type: "A"
+          type: "A",
+          classes: 1
         },
         {
           pos: [(this.width * 3) / 16, this.height / 2],
           color: "#fb5a52",
-          type: "A"
+          type: "A",
+          classes: 1
         },
         {
           pos: [(this.width * 4) / 16, (this.height * 1) / 3],
           color: "#fb5a52",
-          type: "A"
+          type: "A",
+          classes: 1
         },
         {
           pos: [(this.width * 5) / 16, this.height / 2],
           color: "#fb5a52",
-          type: "A"
+          type: "A",
+          classes: 1
         },
         {
           pos: [(this.width * 6) / 16, (this.height * 2) / 3],
           color: "#fb5a52",
-          type: "A"
+          type: "A",
+          classes: 1
         },
         {
           pos: [(this.width * 2) / 3, (this.height * 1) / 3],
           color: "#32b900",
-          type: "B"
+          type: "B",
+          classes: 2
         },
         {
           pos: [(this.width * 2) / 3, this.height / 2],
           color: "#32b900",
-          type: "B"
+          type: "B",
+          classes: 2
         },
         {
           pos: [(this.width * 2) / 3, (this.height * 2) / 3],
           color: "#32b900",
-          type: "B"
+          type: "B",
+          classes: 2
         }
       );
     },
@@ -384,9 +394,11 @@ export default {
           row < this.height + this.drawInterval;
           row += this.drawInterval
         ) {
+          // 为了提速，优化 泛化、作图涂色，不在for体内计算。而在体外算出 所有点的预测值，
+          // 再参考热力图
+          // 对当前的点进行 scaling
           var colNew = (col - minVec[0][1]) / (maxVec[0][1] - minVec[0][1]);
           var rowNew = (row - minVec[0][2]) / (maxVec[0][2] - minVec[0][2]);
-          // 对当前的点进行 scaling
           var curMatNew = math.matrix([[1, colNew, rowNew]]);
           var z = math.multiply(curMatNew, optW).valueOf()[0][0];
           if (z < -3) {
@@ -451,6 +463,7 @@ export default {
     changeColorType(index) {
       // 切换到点击的颜色
       this.currentColor = this.colorTypeStore[index];
+
       this.showWidthStore = [
         "0px",
         "0px",
@@ -592,13 +605,15 @@ export default {
         const x = Math.round(Pos.x);
         const y = Math.round(Pos.y);
         console.log(x, y);
+        this.usedColor.add(this.currentColor);
 
         if (this.statusAdd) {
           var type = this.typeOfColor(this.currentColor);
           this.listPointsPosType.push({
             pos: [x, y],
             color: this.currentColor,
-            type: type
+            type: type,
+            classes: this.usedColor.size
           });
 
           // 在添加状态，只画最后加进list的 点
