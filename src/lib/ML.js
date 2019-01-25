@@ -737,6 +737,53 @@ NN.prototype.softmax = function(inpZ) {
 };
 
 /**
+ * 输入：onehot格式的 模型输出
+ * 输出：分类的类别，"A", "B", "C",....。输出格式:普通list
+ */
+NN.prototype.classesOfOneHotOutput = function(onehotMat) {
+  // var num_classes = onehotMat.size()[1];
+  var onehotArr = onehotMat.valueOf();
+  var classesArr = [];
+  onehotArr.forEach(item => {
+    var cl = this.classOfAOnehot(item);
+    classesArr.push(cl);
+  });
+  return classesArr;
+};
+/**
+ * 将一个list中最大的数的 位置输出。
+ * 1. 输入：普通list;
+ * 2. 输出：类别，"A", "B",...
+ */
+NN.prototype.classOfAOnehot = function(aOnehot) {
+  var classesStore = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+  var maxOfRow = Math.max(...aOnehot);
+  var idxOfMax = aOnehot.indexOf(maxOfRow); // 得到当前行最大数的位置，为num格式
+  var cl = classesStore[idxOfMax];
+  return cl;
+};
+
+/**
+ * 计算前传得到的输出 概率
+ * @param X 输入，输入为一个样本
+ * @param W
+ * @param b 一行多列
+ */
+NN.prototype.calcProbInFP = function(X, W, b) {
+  // Z1 = X*W + b
+  var Z1 = math.add(math.multiply(X, W[1]), b[1]); // (n,4)
+  // console.log("Z1:", Z1);
+  var A1 = this.sigmoid(Z1); // (n,4)
+  // console.log("A1:", A1);
+
+  var Z2 = math.add(math.multiply(A1, W[2]), b[2]); // (n,3)
+  // console.log("Z2:", Z2);
+  var A2 = this.softmax(Z2); // (n,3)
+  // console.log("A2:", A2);
+  return A2;
+};
+
+/**
  * NN解决多分类问题。
  * 输入到此的数据格式：
  * inputX: 被scaling后的。
@@ -775,7 +822,7 @@ NN.prototype.modelTrainCV = function(
   for (let i = 1; i < len_layerList; i++) {
     // 层数从 0开始计数，L0, L1, L2。
     W[i] = math.random([layerList[i - 1], layerList[i]], -1, 1);
-    b[i] = math.random([X.size()[0], layerList[i]], -1, 1); // b的维度：n行多列，n为样本数目
+    b[i] = math.random([1, layerList[i]], -1, 1); // b的维度：n行多列，n为样本数目
   }
 
   for (let i = 0; i < this.stepTotal; i++) {
@@ -784,13 +831,20 @@ NN.prototype.modelTrainCV = function(
 
     // L1
     // var Z1 = X * W[1] + b[1]; // (n,4)
-    var Z1 = math.add(math.multiply(X, W[1]), b[1]); // (n,4)
+    // var b = this.extendArr(b[i],0,X.size()[0]);
+    var Z1 = math.add(
+      math.multiply(X, W[1]),
+      this.extendArr(math.matrix(b[1]), 0, X.size()[0])
+    ); // (n,4)
     var A1 = this.sigmoid(Z1); // (n,4)
     // console.log("A1:", A1);
 
     // L2
     // var Z2 = A1 * W[2] + b[2];
-    var Z2 = math.add(math.multiply(A1, W[2]), b[2]); // (n,3)
+    var Z2 = math.add(
+      math.multiply(A1, W[2]),
+      this.extendArr(math.matrix(b[2]), 0, X.size()[0])
+    ); // (n,3)
     var A2 = this.softmax(Z2); // (n,3)
     // softmax输出为概率
     // console.log("A2:", A2);
@@ -798,15 +852,30 @@ NN.prototype.modelTrainCV = function(
     // ================== 反向传播 =========================
     var A1T = math.transpose(A1);
     // var delta2 = A2i - 1; // 注意此处是 label对应类处 才减一。 比如 [a,b-1,c] 第二类为label类，则只在第二类 减一。
-    // ============== 此处很策略。 先减1，在和label elementwise 乘。 充分发挥label onehot矩阵用处。====================
-    var delta2 = math.dotMultiply(Y, math.subtract(A2, 1)); // (n,3)
+    // ============== ????? 此处很策略。 先减1，在和label elementwise 乘。 充分发挥label onehot矩阵用处。====================
+    // 尝试1
+    // var delta2 = math.dotMultiply(Y, math.subtract(A2, 1)); // (n,3)
+    // console.log("delta2:", delta2);
+
+    // 尝试2 ==========================
+    // console.log("A2:", A2);
+
+    // =================传播的起点，核心 ===
+    var delta2 = math.subtract(A2, Y); // 这是对的了。正确的类别位置减一，其它位置不变。
+
+    // console.log("delta2_temp:", delta2_temp);
+    // var delta2 = math.dotMultiply(Y, delta2_temp);
+    // console.log("delta2:", delta2);
+    //
 
     // var dW2 = A1T * delta2 + lambda * W[2];
     var dW2 = math.add(
       math.multiply(A1T, delta2),
       math.dotMultiply(this.lambda, W[2])
     ); // (4,3)
-    var db2 = delta2; // (n,3)
+    // var db2 = delta2; // (n,3)
+    var db2 = math.sum(delta2, 0);
+    math.reshape(db2, [1, db2.size()[0]]);
 
     // var delta1 = delta2 * W2T .* ( sz1*(1-sz1) );
     var delta1_left = math.multiply(delta2, math.transpose(W[2])); // (n,3)(3,4)=(n,4)
@@ -816,29 +885,38 @@ NN.prototype.modelTrainCV = function(
       math.subtract(1, sigmoid_Z1)
     ); // (n,4)
     var delta1 = math.dotMultiply(delta1_left, delta1_right); // (n,4)
+    // console.log("delta1:", delta1);
     // var dW1 = XT * delta1 + lambda * W[1];
     var dW1 = math.add(
       math.multiply(XT, delta1), // (2,n)(n,4)=(2,4)
       math.multiply(this.lambda, W[1]) // (2,4)
     ); // (2,4)
-    var db1 = delta1; // (n,4)
-    // console.log("dW2:", dW1);
-    // console.log("db2:", db1);
+    // var db1 = delta1; // (n,4)
+    var db1 = math.sum(delta1, 0);
+    math.reshape(db1, [1, db1.size()[0]]);
+
+    // console.log("dW2:", dW2);
+    // console.log("db2:", db2);
+    // console.log("dW1:", dW1);
+    // console.log("db1:", db1);
 
     // ============== 更新 W，b ==================
     // W -= this.stepSize * dW
+    // console.log("W[2]:", W[2]);
     W[2] = math.subtract(W[2], math.multiply(this.stepSize, dW2));
     b[2] = math.subtract(b[2], math.multiply(this.stepSize, db2));
     W[1] = math.subtract(W[1], math.multiply(this.stepSize, dW1));
     b[1] = math.subtract(b[1], math.multiply(this.stepSize, db1));
+    // console.log("W[2]:", W[2]);
   }
+  // console.log("Z2:", Z2);
+  // console.log("A2:", A2);
   // console.log("W[2]:", W[2]);
   // console.log("b[2]:", b[2]);
   // console.log("W[1]:", W[1]);
   // console.log("b[1]:", b[1]);
 
   // 计算下在这个 W，b，所得模型的输出
-  console.log("A2:", A2);
 
   this.W = W;
   this.b = b;
@@ -899,9 +977,9 @@ NN.prototype.modelTrainCV = function(
 // ========================================================================
 // es5写法：导出一个模块对象。 是一个json对象。
 // 在其他文件使用时，也是import进了json对象
-module.exports = {
-  ML: ML
-};
+// module.exports = {
+// ML: ML
+// };
 
 // es6
-// export default ML;
+export default ML;

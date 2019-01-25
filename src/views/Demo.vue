@@ -316,6 +316,9 @@ export default {
       );
       // 为了避免刷新页面时，存储的模型参数 logWval 被清除
       sessionStorage.setItem("Warr", JSON.stringify(this.logWval));
+
+      // 把usedColor storeIn
+      sessionStorage.setItem("usedColor", JSON.stringify(this.usedColor));
     },
     /**
      * 在 mounted 时，加载
@@ -326,10 +329,20 @@ export default {
 
       const Warr = sessionStorage.getItem("Warr") || "[]";
       this.logWval = JSON.parse(Warr);
+
+      const usedColor = sessionStorage.getItem("usedColor") || null;
+      if (usedColor == null) {
+        console.log("usedColor==null:");
+        this.usedColor = new Set(["#fb5a52", "#32b900"]);
+      } else {
+        var usedColor_t = JSON.parse(usedColor);
+        this.usedColor = new Set(usedColor_t);
+      }
+      console.log("usedColor:", this.usedColor, typeof this.usedColor);
     },
 
     handleRun(e) {
-      console.log("run..., type: " + e.type);
+      // console.log("run..., type: " + e.type);
       console.log("%cthis.stepSize:", "color:#44d39f", this.stepSize);
       console.log("%cthis.stepTotal:", "color:#44d39f", this.stepTotal);
       console.log("%cthis.curOptimizer:", "color:#44d39f", this.curOptimizer);
@@ -344,8 +357,21 @@ export default {
           this.curOptimizer,
           true // 记录 W，否则不能画 chart
         );
+      } else if (this.curAlg == "神经网络") {
+        console.log("当前运行的是：" + this.curAlg);
+        console.log("usedColor size: ", this.usedColor.size);
+        console.log("this.usedColor:", this.usedColor);
+        var classes = this.listPointsPosType[this.listPointsPosType.length - 1]
+          .classes;
+        this.NNDrawColorArea(
+          [2, classes * 2, classes],
+          this.stepSize,
+          this.stepTotal,
+          "GD",
+          0
+        );
       } else {
-        alert("逻辑回归之外的算法还未写好。不能运行。");
+        alert("此算法还在路上！");
       }
 
       // 运行时，把list和logWval保存
@@ -383,7 +409,7 @@ export default {
       var optW = res.optW;
       var minVec = res.inputXScaleMinVec.valueOf();
       var maxVec = res.inputXScaleMaxVec.valueOf();
-
+      var t1 = new Date().getTime();
       for (
         var col = 0;
         col < this.width + this.drawInterval;
@@ -401,6 +427,7 @@ export default {
           var rowNew = (row - minVec[0][2]) / (maxVec[0][2] - minVec[0][2]);
           var curMatNew = math.matrix([[1, colNew, rowNew]]);
           var z = math.multiply(curMatNew, optW).valueOf()[0][0];
+
           if (z < -3) {
             // 当 z 为3时，h 即概率为 0.95
             this.drawRect4OnePoint(
@@ -441,6 +468,12 @@ export default {
           }
         }
       }
+
+      console.log(
+        "%c画图着色，两个for循环体结束。耗时[s]：",
+        "color:green",
+        (new Date().getTime() - t1) / 1000
+      );
       this.layer.draw();
     },
     drawRect4OnePoint(layer, x1, x2, drawInterval, color, opacity) {
@@ -453,9 +486,79 @@ export default {
         fill: color,
         opacity: opacity
       });
-      rect.cache();
+      // rect.cache(); // 奇怪的是，不加cache反而快了 5倍。
       layer.add(rect);
     },
+    /**
+     * 使用神经网络对画布上点进行泛化，并着色
+     */
+    NNDrawColorArea(layerList, stepSize, stepTotal, optimizer, lambda) {
+      var nn = new ML.NN();
+      var res = nn
+        .inputTrainRaw(this.listPointsPosType)
+        .inputCS2MatXOneHotY()
+        .featureScaling()
+        .modelTrainCV(layerList, stepSize, stepTotal, optimizer, lambda);
+
+      var W = res.W;
+      var b = res.b;
+      // console.log("W:", W);
+      // console.log("b:", b);
+
+      var minVec = res.inputXScaleMinVec.valueOf();
+      var maxVec = res.inputXScaleMaxVec.valueOf();
+      // console.log("minVec:", minVec);
+      // console.log("maxVec:", maxVec);
+      var t1 = new Date().getTime();
+      for (
+        var col = 0;
+        col < this.width + this.drawInterval;
+        col += this.drawInterval
+      ) {
+        for (
+          var row = 0;
+          row < this.height + this.drawInterval;
+          row += this.drawInterval
+        ) {
+          // 对当前的点进行 scaling
+          var colNew = (col - minVec[0][0]) / (maxVec[0][0] - minVec[0][0]); // col 指代 第一个feature
+          var rowNew = (row - minVec[0][1]) / (maxVec[0][1] - minVec[0][1]); // row是 第二个feature
+          // console.log("colNew:", colNew);
+          // console.log("rowNew:", rowNew);
+          var curMatNew = math.matrix([[colNew, rowNew]]);
+
+          // curMatNew 有错
+
+          // var z = math.multiply(curMatNew, optW).valueOf()[0][0];
+          // 算出当前点数据输入大model后，输出的onehot
+          // console.log("curMatNew:", curMatNew);
+          var onehot = nn.calcProbInFP(curMatNew, W, b);
+          // console.log("onehot:", onehot.valueOf()[0]);
+          var cl = nn.classOfAOnehot(onehot.valueOf()[0]); // 输出 "A","B",...
+          // console.log("cl:", cl);
+          var numCl = nn.labelOfType(cl)[0];
+          // console.log("numCl:", numCl);
+
+          let cColor = this.colorTypeStore[numCl];
+          this.drawRect4OnePoint(
+            this.layer,
+            col,
+            row,
+            this.drawInterval,
+            cColor,
+            0.35
+          );
+        }
+      }
+
+      console.log(
+        "%c画图着色，两个for循环体结束。耗时[s]：",
+        "color:green",
+        (new Date().getTime() - t1) / 1000
+      );
+      this.layer.draw();
+    },
+
     showAllDataInfo() {
       console.log("当前使用的算法：", this.curAlg);
       console.log("所有点数据: ", this.listPointsPosType);
@@ -560,6 +663,7 @@ export default {
       this.listPointsPosType = [];
       this.clearStage(this.stage, this.layer);
       sessionStorage.removeItem("listPoints");
+      sessionStorage.removeItem("usedColor");
     },
     /**
      * 10种颜色对应10类
@@ -606,6 +710,7 @@ export default {
         const y = Math.round(Pos.y);
         console.log(x, y);
         this.usedColor.add(this.currentColor);
+        // console.log("this.usedColor:", this.usedColor);
 
         if (this.statusAdd) {
           var type = this.typeOfColor(this.currentColor);
@@ -654,7 +759,7 @@ export default {
      *    可在舞台上点击画点，借助按钮实现移除某点，清空所有。
      */
     newCanvas() {
-      console.log("newCanvas");
+      // console.log("newCanvas");
       this.stage = new Konva.Stage({
         container: "container",
         width: this.width,

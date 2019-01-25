@@ -7,23 +7,25 @@ const { ML } = require("./ML");
 // import ML from "./ML";
 
 var inp = [
-  { pos: [50, 50], type: "C", color: "" },
+  { pos: [87, 0], type: "B", color: "" },
+  { pos: [5, 90], type: "C", color: "" },
+  { pos: [5, 100], type: "C", color: "" },
   { pos: [1, 2], type: "A", color: "" },
   { pos: [2, 3], type: "A", color: "" },
   { pos: [4, 2], type: "A", color: "" },
-  { pos: [20, 40], type: "A", color: "" },
-  { pos: [19, 40], type: "A", color: "" },
-  { pos: [40, 20], type: "A", color: "" },
-  { pos: [40, 19], type: "A", color: "" },
-  { pos: [100, 60], type: "B", color: "" },
-  { pos: [90, 60], type: "B", color: "" },
-  { pos: [88, 88], type: "B", color: "" },
-  { pos: [99, 99], type: "B", color: "" },
-  { pos: [70, 70], type: "B", color: "" },
-  { pos: [59, 59], type: "C", color: "" },
-  { pos: [59, 69], type: "C", color: "" },
-  { pos: [69, 59], type: "C", color: "" },
-  { pos: [60, 100], type: "B", color: "", classes: 3 }
+  { pos: [3, 3], type: "A", color: "" },
+  { pos: [10, 10], type: "A", color: "" },
+  { pos: [6, 3], type: "A", color: "" },
+  { pos: [3, 8], type: "A", color: "" },
+  { pos: [100, 6], type: "B", color: "" },
+  { pos: [90, 10], type: "B", color: "" },
+  { pos: [88, 8], type: "B", color: "" },
+  { pos: [99, 4], type: "B", color: "" },
+  { pos: [70, 12], type: "B", color: "" },
+  { pos: [5, 70], type: "C", color: "" },
+  { pos: [9, 69], type: "C", color: "" },
+  { pos: [3, 99], type: "C", color: "" },
+  { pos: [70, 10], type: "B", color: "", classes: 3 }
 ];
 
 var nn = new ML.NN();
@@ -32,7 +34,25 @@ var res = nn
   .inputTrainRaw(inp)
   .inputCS2MatXOneHotY()
   .featureScaling()
-  .modelTrainCV([2, 3, 3], 0.1, 100, "GD", 1);
+  .modelTrainCV([2, 10, 3], 0.1, 100, "GD", 0);
+
+// for (var i = 0; i < 100 ** 2; i++) {
+// var X = res.inputX;
+// var W = res.W;
+// var b = res.b;
+// var Z1 = math.add(math.multiply(X, W[1]), b[1]); // (n,4)
+// var A1 = nn.sigmoid(Z1); // (n,4)
+
+// var Z2 = math.add(math.multiply(A1, W[2]), b[2]); // (n,3)
+// var A2 = nn.softmax(Z2); // (n,3)
+// // }
+// console.log("A2:", A2);
+
+// var prob = nn.calcProbInFP(res.inputX, res.W, res.b);
+
+// console.log("prob:", prob);
+// var classes = nn.classesOfOneHotOutput(prob);
+// console.log("classes:\n", classes);
 
 // var s1 = nn.softmax(res.inputX);
 // console.log("res:", res);

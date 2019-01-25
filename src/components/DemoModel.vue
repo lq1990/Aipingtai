@@ -43,7 +43,7 @@
             <div>
               <div style="text-align: right">省时 粗糙</div>
               <div>
-                <el-slider v-model="drawInt" :min="1" :max="50"></el-slider>
+                <el-slider v-model="drawInt" :min="2" :max="50"></el-slider>
               </div>
               <div>精细 耗时</div>
             </div>
@@ -78,7 +78,7 @@
             <div>
               <div style="text-align: right">省时 粗糙</div>
               <div>
-                <el-slider v-model="drawInt" :min="1" :max="50"></el-slider>
+                <el-slider v-model="drawInt" :min="2" :max="50"></el-slider>
               </div>
               <div>精细 耗时</div>
             </div>

@@ -3,17 +3,49 @@ const math = require("mathjs");
 // var res = math.ones(4, 3);
 // console.log("res:", res);
 
-var a = [[1, 2, 3]];
-a.push([4, 5, 6]);
-a.push([7, 8, 9]);
-a.push([11, 22, 33]);
+var a = [[11, 2, 3]];
+a.push([4, 55, 6]);
+a.push([7, 8, 99]);
+a.push([111, 22, 33]);
 // console.log("a:", a);
-// var ma = math.matrix(a);
+var ma = math.matrix(a);
+console.log("ma:", ma);
+var res = math.sum(ma, 0);
+math.reshape(res, [1, res.size()[0]]);
+console.log("res:", res);
+// var res = [math.mean(ma, 0).valueOf()];
+
+// math.reshape(res, [1, 3]);
+// console.log("res:", math.matrix(res));
+// console.log("res1:", res1);
+// var maVal = ma.valueOf();
+// console.log("maVal:", maVal);
+
+// maVal.forEach(function(item, index) {
+//   console.log("item:", item);
+//   console.log("index:", index);
+
+//   var maxV = Math.max(...item);
+//   var idx = item.indexOf(maxV);
+//   console.log("idx:", idx);
+// });
+
+// var l = [3, 5, 7];
+// var maxl = Math.max(...l);
+// console.log("maxl:", maxl);
+
 // console.log("ma:", ma);
 // console.log("res:", res);
 
-var res = math.random([3, 2], -1, 1);
-console.log("res:", res, typeof res);
+// 使用forEach会遍历 矩阵中每一个单一元素，
+// math.forEach(ma, function(item, index, arr) {
+//   console.log("item:", item);
+//   console.log("index:", index);
+//   console.log("arr:", arr);
+// });
+
+// var res = math.random([3, 2], -1, 1);
+// console.log("res:", res, typeof res);
 // var res = math.sum(ma, 1);
 // console.log("res:", res);
 // var ma1 = math.matrix(ma);
