@@ -7,7 +7,9 @@ export default {
     stepSize: 0.1,
     stepTotal: 100,
     curOptimizer: "GD",
-    drawInterval: 20
+    lambda: 0, // 惩罚系数
+    drawInterval: 20,
+    isCompareOptimizer: false
   },
   mutations: {
     changeCurAlg(state, payload) {
@@ -16,17 +18,23 @@ export default {
     changeCurAlgIdx(state, payload) {
       state.curAlgIdx = payload;
     },
-    changeCurOptimizer(state, payload) {
-      state.curOptimizer = payload;
-    },
     changeStepSize(state, payload) {
       state.stepSize = payload;
     },
     changeStepTotal(state, payload) {
       state.stepTotal = payload;
     },
+    changeCurOptimizer(state, payload) {
+      state.curOptimizer = payload;
+    },
+    changeLambda(state, payload) {
+      state.lambda = payload;
+    },
     changeDrawInterval(state, payload) {
       state.drawInterval = payload;
+    },
+    changeIsCompareOptimizer(state, payload) {
+      state.isCompareOptimizer = payload;
     }
   },
   getters: {

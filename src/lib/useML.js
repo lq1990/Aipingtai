@@ -7,34 +7,51 @@ const { ML } = require("./ML");
 // import ML from "./ML";
 
 var inp = [
-  { pos: [87, 0], type: "B", color: "" },
-  { pos: [5, 90], type: "C", color: "" },
-  { pos: [5, 100], type: "C", color: "" },
-  { pos: [1, 2], type: "A", color: "" },
-  { pos: [2, 3], type: "A", color: "" },
-  { pos: [4, 2], type: "A", color: "" },
-  { pos: [3, 3], type: "A", color: "" },
-  { pos: [10, 10], type: "A", color: "" },
-  { pos: [6, 3], type: "A", color: "" },
-  { pos: [3, 8], type: "A", color: "" },
-  { pos: [100, 6], type: "B", color: "" },
-  { pos: [90, 10], type: "B", color: "" },
-  { pos: [88, 8], type: "B", color: "" },
-  { pos: [99, 4], type: "B", color: "" },
-  { pos: [70, 12], type: "B", color: "" },
-  { pos: [5, 70], type: "C", color: "" },
-  { pos: [9, 69], type: "C", color: "" },
-  { pos: [3, 99], type: "C", color: "" },
-  { pos: [70, 10], type: "B", color: "", classes: 3 }
+  { pos: [87, 0], type: "B", color: "b" },
+  { pos: [5, 90], type: "C", color: "c" },
+  { pos: [5, 100], type: "C", color: "c" },
+  { pos: [1, 2], type: "A", color: "a" },
+  { pos: [2, 3], type: "A", color: "a" },
+  { pos: [4, 2], type: "A", color: "a" },
+  { pos: [3, 3], type: "A", color: "a" },
+  { pos: [10, 10], type: "A", color: "a" },
+  { pos: [6, 3], type: "A", color: "a" },
+  { pos: [3, 8], type: "A", color: "a" },
+  { pos: [100, 6], type: "B", color: "b" },
+  { pos: [90, 10], type: "B", color: "b" },
+  { pos: [88, 8], type: "B", color: "b" },
+  { pos: [99, 4], type: "B", color: "b" },
+  { pos: [70, 12], type: "B", color: "b" },
+  { pos: [5, 70], type: "C", color: "c" },
+  { pos: [9, 69], type: "C", color: "c" },
+  { pos: [3, 99], type: "C", color: "c" },
+  { pos: [70, 10], type: "B", color: "b" }
 ];
 
-var nn = new ML.NN();
 // var layerList = [2, 4, 2];
-var res = nn
-  .inputTrainRaw(inp)
-  .inputCS2MatXOneHotY()
-  .featureScaling()
-  .modelTrainCV([2, 10, 3], 0.1, 100, "GD", 0);
+
+var alg = 1;
+// 神经网络
+if (alg == 0) {
+  var nn = new ML.NN();
+  var res = nn
+    .inputTrainRaw(inp)
+    .inputCS2MatXOneHotY(["a", "b", "c"])
+    .featureScaling()
+    .modelTrainCV([2, 10, 3], 0.1, 100, "Adadelta", 0);
+
+  // console.log("res:", res);
+}
+// 逻辑回归;
+if (alg == 1) {
+  var lr = new ML.LogReg();
+  var res = lr
+    .inputTrainRaw(inp)
+    .inputCS2Mat(["a", "b"])
+    .featureScaling(1)
+    .modelTrainCV(1, 3, "RMSProp", true);
+  console.log("res:", res);
+}
 
 // for (var i = 0; i < 100 ** 2; i++) {
 // var X = res.inputX;
@@ -58,7 +75,7 @@ var res = nn
 // console.log("res:", res);
 // console.log("s1:", s1);
 // var lr = new ML.LogReg();
-// 链式调用的核心是 return this;
+// // 链式调用的核心是 return this;
 // var res = lr
 // .inputTrainRaw(inp)
 // .inputCS2Mat()

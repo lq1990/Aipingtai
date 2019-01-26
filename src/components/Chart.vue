@@ -9,26 +9,85 @@ import ECharts from "vue-echarts";
 import "echarts/lib/chart/line";
 import "echarts/lib/component/legend";
 import "echarts/lib/component/tooltip";
+import "echarts/lib/component/title";
 export default {
   name: "chart",
-  props: ["costArr", "logWval"],
+  props: ["costArr"], // 当对比 优化器时，arr存储的是 [[],[],[]]
   data() {
     let plotX = [];
     let plotY = [];
+
     this.costArr.forEach((item, index) => {
       plotX.push(index);
       plotY.push(item);
     });
-    let w0 = [];
-    let w1 = [];
-    let w2 = [];
-    for (let i = 0; i < this.logWval.length; i++) {
-      w0.push(this.logWval[i][0][0]);
-      w1.push(this.logWval[i][1][0]);
-      w2.push(this.logWval[i][2][0]);
-    }
+    // let plotYgd = [];
+    //     let plotYrms = [];
+    //     let plotYadadelta = [];
+    // if (  this.compareOptimizerCostArr.length == 3) {
+    //   gdArr.forEach((item, index) => {
+    //     plotX.push(index);
+    //     plotYgd.push(item);
+    //   });
+    //   rmsArr.forEach((item, index) => {
+    //     plotYrms.push(item);
+    //   });
+    //   adadeltaArr.forEach((item, index) => {
+    //     plotYadadelta.push(item);
+    //   });
+
+    //   var gdArr = this.compareOptimizerCostArr[0];
+    //   var rmsArr = this.compareOptimizerCostArr[1];
+    //   var adadeltaArr = this.compareOptimizerCostArr[2];
+
+    //   let ret = {
+    //     title: {
+    //       text: "对比使用不同优化器时的损失值变化"
+    //     },
+    //     legend: {
+    //       x: "right",
+    //       orient: "veritcal"
+    //     },
+    //     tooltip: {
+    //       trigger: "axis",
+    //       axisPointer: {
+    //         type: "cross",
+    //         label: {
+    //           backgroundColor: "#ccc"
+    //         }
+    //       }
+    //     },
+    //     xAxis: {
+    //       type: "category",
+    //       // category 必须。不能换成value，否则有问题
+    //       data: plotX
+    //     },
+    //     yAxis: {
+    //       type: "value"
+    //     },
+    //     series: [
+    //       {
+    //         name: "GD_cost",
+    //         data: plotYgd,
+    //         type: "line"
+    //       },
+    //       {
+    //         name: "RMSProp_cost",
+    //         data: plotYrms,
+    //         type: "line"
+    //       },
+    //       {
+    //         name: "Adadelta_cost",
+    //         data: plotYadadelta,
+    //         type: "line"
+    //       }
+    //     ]
+    //   };
+    // }
+
     return {
       lineCost2: {
+        title: {},
         legend: {},
         tooltip: {
           trigger: "axis",
@@ -51,26 +110,6 @@ export default {
           {
             name: "cost",
             data: plotY,
-            type: "line"
-            // label: {
-            //   normal: {
-            //     show: true
-            //   }
-            // }
-          },
-          {
-            name: "w0",
-            data: w0,
-            type: "line"
-          },
-          {
-            name: "w1",
-            data: w1,
-            type: "line"
-          },
-          {
-            name: "w2",
-            data: w2,
             type: "line"
           }
         ]

@@ -17,7 +17,7 @@
     <div class="temp">
       <template v-if="curAlg=='逻辑回归'">
         <div class="hint">
-          <span style="font-weight: bold">提醒</span>：使用逻辑回归做二分类时，请确保画布上只有
+          <span style="font-weight: bold">提示</span>：使用逻辑回归做二分类时，请确保画布上只有
           <span style="background:#fb5a52;color:white">红</span>
           <span style="background:#32b900;color:white">绿</span>两类。
         </div>
@@ -54,6 +54,11 @@
       </template>
 
       <template v-if="curAlg=='神经网络'">
+        <div class="hint">
+          <span style="font-weight: bold">提示</span>：
+          当画布上只有一种颜色时，神经网络做<span style="background:#fd7d46;color:white">回归</span>，
+          否则做<span style="background:#fd7d46;color:white">分类</span>。
+        </div>
         <div class="params-render">
           <div class="params">
             <h4>参数：</h4>
@@ -68,7 +73,9 @@
                 <el-radio-button v-for="(item, index) in optimizerArr" :key="index" :label="item"></el-radio-button>
               </el-radio-group>
             </div>
-            <div class="params-items">惩罚系数</div>
+            <div class="params-items">惩罚系数：
+              <el-input size="mini" class="input" v-model="lambda_temp"></el-input>
+            </div>
             <div class="params-items">结构一览</div>
 
           </div>
@@ -85,7 +92,10 @@
           </div>
         </div>
         <input type="button" value="显示参数" @click="handleParamsShow"> &nbsp;
-        <input type="button" value="重置" @click="handleParamsReset">
+        <input type="button" value="重置" @click="handleParamsReset">&nbsp;
+        <!-- <input type="button" value="对比优化器" @click="handleCompareOptimizer">  -->
+        <el-button size="mini" type="warning" 
+          @click="handleCompareOptimizer">对比优化器 开/关</el-button>
       </template>
 
       <template v-if="curAlg=='线性回归'">
@@ -117,7 +127,9 @@ export default {
       "stepTotal",
       "optimizerArr",
       "curOptimizer",
-      "drawInterval"
+      "lambda",
+      "drawInterval",
+      "isCompareOptimizer"
     ]),
     stepS: {
       get() {
@@ -146,6 +158,15 @@ export default {
         this.saveParamsInStorage();
       }
     },
+    lambda_temp: {
+      get() {
+        return this.lambda;
+      },
+      set(val) {
+        this.changeLambda(val);
+        this.saveParamsInStorage();
+      }
+    },
     drawInt: {
       get() {
         return this.drawInterval;
@@ -157,13 +178,36 @@ export default {
     }
   },
   methods: {
+    handleCompareOptimizer() {
+      // 设置一个确认 弹框，提醒 ‘对比各个优化器并展示，将持续一会儿，确认继续吗？’
+      this.$confirm(
+        "<p>开：对比各个优化器并展示，将运行一会儿。</p><p>关：关闭图表。</p>",
+        "提示",
+        {
+          confirmButtonText: "开",
+          cancelButtonText: "关",
+          type: "warning",
+          dangerouslyUseHTMLString: true
+        }
+      )
+        .then(() => {
+          this.changeIsCompareOptimizer(true);
+          // console.log("isCompareOptimizer: ", this.isCompareOptimizer);
+        })
+        .catch(() => {
+          this.changeIsCompareOptimizer(false);
+          // console.log("isCompareOptimizer:", this.isCompareOptimizer);
+        });
+    },
     ...mapMutations("demo", [
       "changeCurAlg",
       "changeCurAlgIdx",
       "changeStepSize",
       "changeStepTotal",
       "changeCurOptimizer",
-      "changeDrawInterval"
+      "changeLambda",
+      "changeDrawInterval",
+      "changeIsCompareOptimizer"
     ]),
     handleCardChange(cur) {
       // (cur, old) 传入参数为 索引
@@ -184,6 +228,7 @@ export default {
       this.changeStepSize(0.1);
       this.changeStepTotal(100);
       this.changeCurOptimizer("GD");
+      this.changeLambda(0);
       this.changeDrawInterval(20);
 
       this.saveParamsInStorage();
@@ -195,6 +240,7 @@ export default {
         stepSize: this.stepSize,
         stepTotal: this.stepTotal,
         curOptimizer: this.curOptimizer,
+        lambda: this.lambda,
         drawInterval: this.drawInterval
       };
       sessionStorage.setItem("paramsObj", JSON.stringify(paramsObj));
@@ -219,11 +265,19 @@ export default {
       } else {
         this.changeStepTotal(this.stepTotal);
       }
+
       if (paramsObj.curOptimizer) {
         this.changeCurOptimizer(paramsObj.curOptimizer);
       } else {
         this.changeCurOptimizer(this.curOptimizer);
       }
+
+      if (paramsObj.lambda) {
+        this.changeLambda(paramsObj.lambda);
+      } else {
+        this.changeLambda(this.lambda);
+      }
+
       if (paramsObj.drawInterval) {
         this.changeDrawInterval(paramsObj.drawInterval);
       } else {
@@ -301,5 +355,19 @@ export default {
 
 .el-slider__button {
   border: 2px solid #ff9f44 !important;
+}
+
+.el-button--warning {
+  background-color: #ff9f44 !important;
+  border-color: #ff9f44 !important;
+}
+.el-button--warning:focus,
+.el-button--warning:hover {
+  background-color: #fdad62 !important;
+  border-color: #ff9f44 !important;
+}
+.el-button--warning:active {
+  background-color: #faa555 !important;
+  border-color: #ff9f44 !important;
 }
 </style>

@@ -8,7 +8,6 @@
         <div class="btn-wrap">
           <div style="display: flex; justify-content: center; margin: 15px 0;">
             <el-button type="danger" @click="handleRun" :style="{width: width/3+'px'}">运行</el-button>
-            <el-button type="danger" @click="handleParams">参数</el-button>
           </div>
 
           <div class="btn-point">
@@ -57,6 +56,10 @@
       </div>
 
       <demo-model class="demo-model"></demo-model>
+
+      <!-- 注意对比：使用div.no-use 还是用 demo-model pd-right: 2%
+      对比之后发现还是 flex的div好 -->
+      <div class="no-use"></div>
     </div>
 
     <div v-else class="demo-small">
@@ -66,7 +69,6 @@
       <div class="btn-wrap">
         <div style="display: flex; justify-content: center; margin: 15px 0;">
           <el-button type="danger" @click="handleRun" :style="{width: width/3+'px'}">运行</el-button>
-          <el-button type="danger" @click="handleParams">参数</el-button>
         </div>
 
         <div class="btn-point">
@@ -119,17 +121,26 @@
     <div class="chart-wrap">
       <div class="btnChart">
         <!-- 当点击按钮时，再计算 cost值，把cost画出来。 -->
-        <el-button class="btn" type="danger" @click="handleChart">Chart On/Off</el-button>
+        <el-button class="btn" type="danger" @click="handleChart">损失值展示 开/关</el-button>
+        
       </div>
       <chart
         v-if="isShowChart"
         class="mychart"
         :cost-arr="costArr"
-        :log-wval="logWval"
         :style="{width: width+'px', height:height*2/3+'px'}"
       ></chart>
       <!-- v-if为惰性加载，当点击 chart按钮时，costArr先计算，然后再加载 chart组件。
       就可以实现画图了-->
+
+
+      <!-- 下面的chart，当点击 对比优化器按钮并确认后，激活 -->
+      <chart-compare
+        v-if="isCompareOptimizer"
+        class="mychart"
+        :compare-optimizer-cost-arr="compareOptimizerCostArr"
+        :style="{width: width+'px', height:height*2/3+'px'}"
+      ></chart-compare>
     </div>
   </div>
 </template>
@@ -154,12 +165,14 @@ import Konva from "konva";
 import * as math from "mathjs";
 import ML from "../lib/ML.js";
 import Chart from "../components/Chart.vue";
+import ChartCompare from "../components/ChartCompare.vue";
 import DemoModel from "../components/DemoModel.vue";
-import { mapState } from "vuex";
+import { mapState, mapMutations } from "vuex";
 export default {
   name: "demo",
   components: {
     chart: Chart,
+    "chart-compare": ChartCompare,
     "demo-model": DemoModel
   },
   computed: {
@@ -168,20 +181,22 @@ export default {
       "stepSize",
       "stepTotal",
       "curOptimizer",
-      "drawInterval"
+      "lambda",
+      "drawInterval",
+      "isCompareOptimizer"
     ])
   },
   data() {
     return {
       isLargeScreen: isLarge,
       isShowChart: false,
-      // drawInterval: 20,
-      // 对画布上的点进行分类后，用rect绘图时的间距，若间距为1则会延长计算渲染时长
       width: width, // 画布的宽
       height: height, // 画布的高
       statusAdd: true, // 点增加、移除
       currentColor: "#fb5a52",
-      usedColor: new Set(["#fb5a52", "#32b900"]), // 颜色的数目 代表 数据的类别数目
+      // usedColor: new Set(["#fb5a52", "#32b900"]), // 颜色的数目 代表 数据的类别数目。
+      // 不再用全局变量usedColor，在 run时再考虑它。
+      usedColorList: [],
       showWidthStore: [
         "2px",
         "0px",
@@ -219,34 +234,85 @@ export default {
       logWval: [], // 存储了模型参数 W 对应每一步的值. Array, 多个 3行1列 [第i步][第j个w][0]
       inputX: [], // 画布上点数据对应的 Features, 格式: math.matrix
       inputY: [], // 画布上点数据对应的 Labels，格式：math.matrix
-      costArr: [] // 将每一步迭代对应的 cost值存储，格式：普通的 array [,,,...]
+      costArr: [], // 将每一步迭代对应的 cost值存储，格式：普通的 array [,,,...]
+      compareOptimizerCostArr: [],
+      ALarr: [] // NN中，来存储每一步迭代 前向算出的AL
     };
   },
   methods: {
+    ...mapMutations("demo", ["changeIsCompareOptimizer", "changeCurOptimizer"]),
+    compareOptimizer() {
+      this.compareOptimizerCostArr = [];
+
+      this.changeCurOptimizer("GD");
+      this.handleRun();
+      this.costArr = this.calcCostArr(
+        this.logWval,
+        this.inputX,
+        this.inputY,
+        this.ALarr
+      );
+      this.compareOptimizerCostArr.push(this.costArr);
+
+      this.changeCurOptimizer("RMSProp");
+      this.handleRun();
+      this.costArr = this.calcCostArr(
+        this.logWval,
+        this.inputX,
+        this.inputY,
+        this.ALarr
+      );
+      this.compareOptimizerCostArr.push(this.costArr);
+
+      this.changeCurOptimizer("Adadelta");
+      this.handleRun(); // 在run时，把 isCompareOptimizer 关闭了
+      this.costArr = this.calcCostArr(
+        this.logWval,
+        this.inputX,
+        this.inputY,
+        this.ALarr
+      );
+      this.compareOptimizerCostArr.push(this.costArr);
+
+      this.changeIsCompareOptimizer(true); // 再打开
+
+      console.log("compareOptimizerCostArr:", this.compareOptimizerCostArr);
+    },
     handleClearColor() {
       this.clearStage(this.stage, this.layer);
       this.drawPointsFromList(this.layer, this.listPointsPosType);
     },
-    calcCostArr(Wval, X, Y) {
-      let lr = new ML.LogReg();
-      let costArr = lr.calcCostArr(Wval, X, Y);
+    calcCostArr(Wval, X, Y, ALarr) {
+      let costArr;
+      if (this.curAlg == "逻辑回归") {
+        let lr = new ML.LogReg();
+        costArr = lr.calcCostArr(Wval, X, Y);
+      } else if (this.curAlg == "神经网络") {
+        let nn = new ML.NN();
+        costArr = nn.calcCostArr(ALarr, Y);
+      } else {
+        costArr = null;
+      }
       return costArr;
     },
     /**
      * 点击 Chart 按钮时，先计算costArr，再将其画出
      */
     handleChart() {
-      this.costArr = this.calcCostArr(this.logWval, this.inputX, this.inputY);
+      this.costArr = this.calcCostArr(
+        this.logWval,
+        this.inputX,
+        this.inputY,
+        this.ALarr
+      );
+      // console.log("this.costArr:", this.costArr);
       this.isShowChart = !this.isShowChart;
       // console.log("this.costArr.length:", this.costArr.length);
       // console.log("this.costArr:", this.costArr);
       // console.log("this.inputX:", this.inputX);
       // console.log("this.inputY:", this.inputY);
     },
-    handleParams() {
-      console.log(this.logWval); // [][][] 1：第i步，2：第j个w， 3：为0
-      // console.log(this.logWval[967][0][0]);
-    },
+
     initListPoints() {
       if (this.listPointsPosType.length != 0) {
         // 如果 list中已经有数据了，则刷新页面并不会 往list里push数据。
@@ -256,51 +322,35 @@ export default {
       this.listPointsPosType.push(
         {
           pos: [this.width / 8, (this.height * 2) / 3],
-          color: "#fb5a52",
-          type: "A",
-          classes: 1
+          color: "#fb5a52"
         },
         {
           pos: [(this.width * 3) / 16, this.height / 2],
-          color: "#fb5a52",
-          type: "A",
-          classes: 1
+          color: "#fb5a52"
         },
         {
           pos: [(this.width * 4) / 16, (this.height * 1) / 3],
-          color: "#fb5a52",
-          type: "A",
-          classes: 1
+          color: "#fb5a52"
         },
         {
           pos: [(this.width * 5) / 16, this.height / 2],
-          color: "#fb5a52",
-          type: "A",
-          classes: 1
+          color: "#fb5a52"
         },
         {
           pos: [(this.width * 6) / 16, (this.height * 2) / 3],
-          color: "#fb5a52",
-          type: "A",
-          classes: 1
+          color: "#fb5a52"
         },
         {
           pos: [(this.width * 2) / 3, (this.height * 1) / 3],
-          color: "#32b900",
-          type: "B",
-          classes: 2
+          color: "#32b900"
         },
         {
           pos: [(this.width * 2) / 3, this.height / 2],
-          color: "#32b900",
-          type: "B",
-          classes: 2
+          color: "#32b900"
         },
         {
           pos: [(this.width * 2) / 3, (this.height * 2) / 3],
-          color: "#32b900",
-          type: "B",
-          classes: 2
+          color: "#32b900"
         }
       );
     },
@@ -318,7 +368,7 @@ export default {
       sessionStorage.setItem("Warr", JSON.stringify(this.logWval));
 
       // 把usedColor storeIn
-      sessionStorage.setItem("usedColor", JSON.stringify(this.usedColor));
+      // sessionStorage.setItem("usedColor", JSON.stringify(this.usedColor));
     },
     /**
      * 在 mounted 时，加载
@@ -330,19 +380,36 @@ export default {
       const Warr = sessionStorage.getItem("Warr") || "[]";
       this.logWval = JSON.parse(Warr);
 
-      const usedColor = sessionStorage.getItem("usedColor") || null;
-      if (usedColor == null) {
-        console.log("usedColor==null:");
-        this.usedColor = new Set(["#fb5a52", "#32b900"]);
-      } else {
-        var usedColor_t = JSON.parse(usedColor);
-        this.usedColor = new Set(usedColor_t);
-      }
-      console.log("usedColor:", this.usedColor, typeof this.usedColor);
+      // const usedColor = sessionStorage.getItem("usedColor") || null;
+      // if (usedColor == null) {
+      //   console.log("usedColor==null:");
+      //   this.usedColor = new Set(["#fb5a52", "#32b900"]);
+      // } else {
+      //   var usedColor_t = JSON.parse(usedColor);
+      //   this.usedColor = new Set(usedColor_t);
+      // }
+      // console.log("usedColor:", this.usedColor, typeof this.usedColor);
     },
 
     handleRun(e) {
-      // console.log("run..., type: " + e.type);
+      // 运行时，先把chart关闭
+      this.isShowChart = false;
+      // this.isCompareOptimizer = false;
+      this.changeIsCompareOptimizer(false);
+      // 点击run时，首先遍历所有的点数据，确定有多少类。可避免是有 全局变量 usedColor
+      // 只有一类则做回归
+      // 多类时做分类。
+      // 聚类时，不考虑点的颜色信息，只考虑点的坐标。
+      let usedColorSet = new Set();
+      this.listPointsPosType.forEach(item => {
+        let itemColor = item.color;
+        usedColorSet.add(itemColor);
+      });
+      let usedColorList = Array.from(usedColorSet);
+      this.usedColorList = usedColorList;
+
+      console.log("this.usedColorList:", this.usedColorList);
+
       console.log("%cthis.stepSize:", "color:#44d39f", this.stepSize);
       console.log("%cthis.stepTotal:", "color:#44d39f", this.stepTotal);
       console.log("%cthis.curOptimizer:", "color:#44d39f", this.curOptimizer);
@@ -354,21 +421,21 @@ export default {
         this.LogRegDrawColorArea(
           this.stepSize,
           this.stepTotal,
-          this.curOptimizer,
-          true // 记录 W，否则不能画 chart
+          this.curOptimizer
         );
       } else if (this.curAlg == "神经网络") {
         console.log("当前运行的是：" + this.curAlg);
-        console.log("usedColor size: ", this.usedColor.size);
-        console.log("this.usedColor:", this.usedColor);
-        var classes = this.listPointsPosType[this.listPointsPosType.length - 1]
-          .classes;
+
+        // console.log("usedColor size: ", this.usedColor.size);
+        // console.log("this.usedColor:", this.usedColor);
+        // var classes = this.listPointsPosType[this.listPointsPosType.length - 1]
+        //   .classes;
         this.NNDrawColorArea(
-          [2, classes * 2, classes],
+          [2, Math.max(usedColorList.length * 2, 6), usedColorList.length],
           this.stepSize,
           this.stepTotal,
-          "GD",
-          0
+          this.curOptimizer,
+          this.lambda // lambda
         );
       } else {
         alert("此算法还在路上！");
@@ -388,7 +455,7 @@ export default {
 
       var res = lr
         .inputTrainRaw(this.listPointsPosType)
-        .inputCS2Mat()
+        .inputCS2Mat(this.usedColorList)
         .featureScaling()
         .modelTrainCV(ss, st, opt, isLogW);
       // .modelTrainCV(1, 100, "RMSProp", true, 10);
@@ -445,7 +512,7 @@ export default {
               row,
               this.drawInterval,
               "#fb5a52",
-              0.37
+              0.36
             );
           } else if (z < 3) {
             this.drawRect4OnePoint(
@@ -454,7 +521,7 @@ export default {
               row,
               this.drawInterval,
               "#32b900",
-              0.37
+              0.36
             );
           } else {
             this.drawRect4OnePoint(
@@ -493,13 +560,16 @@ export default {
      * 使用神经网络对画布上点进行泛化，并着色
      */
     NNDrawColorArea(layerList, stepSize, stepTotal, optimizer, lambda) {
+      // let numClassColors = layerList[layerList.length - 1];
       var nn = new ML.NN();
       var res = nn
         .inputTrainRaw(this.listPointsPosType)
-        .inputCS2MatXOneHotY()
+        .inputCS2MatXOneHotY(this.usedColorList)
         .featureScaling()
         .modelTrainCV(layerList, stepSize, stepTotal, optimizer, lambda);
 
+      this.ALarr = res.ALarr;
+      this.inputY = res.inputY;
       var W = res.W;
       var b = res.b;
       // console.log("W:", W);
@@ -523,30 +593,29 @@ export default {
           // 对当前的点进行 scaling
           var colNew = (col - minVec[0][0]) / (maxVec[0][0] - minVec[0][0]); // col 指代 第一个feature
           var rowNew = (row - minVec[0][1]) / (maxVec[0][1] - minVec[0][1]); // row是 第二个feature
-          // console.log("colNew:", colNew);
-          // console.log("rowNew:", rowNew);
           var curMatNew = math.matrix([[colNew, rowNew]]);
 
-          // curMatNew 有错
-
-          // var z = math.multiply(curMatNew, optW).valueOf()[0][0];
-          // 算出当前点数据输入大model后，输出的onehot
-          // console.log("curMatNew:", curMatNew);
           var onehot = nn.calcProbInFP(curMatNew, W, b);
-          // console.log("onehot:", onehot.valueOf()[0]);
-          var cl = nn.classOfAOnehot(onehot.valueOf()[0]); // 输出 "A","B",...
-          // console.log("cl:", cl);
-          var numCl = nn.labelOfType(cl)[0];
-          // console.log("numCl:", numCl);
+          var onehotList = onehot.valueOf()[0]; // list
+          var onehotMaxProb = Math.max(...onehotList);
 
-          let cColor = this.colorTypeStore[numCl];
+          // 对一个点输入到模型，返回的是 一个1行3列的概率值的 matrix
+
+          var cl = nn.classOfAOnehot(onehot.valueOf()[0], this.usedColorList);
+          // 找到一行中最大的概率的index处对应的颜色，输出 颜色
+          var opa;
+          if (onehotMaxProb >= 0.95) {
+            opa = 0.35;
+          } else {
+            opa = 0.35;
+          }
           this.drawRect4OnePoint(
             this.layer,
             col,
             row,
             this.drawInterval,
-            cColor,
-            0.35
+            cl,
+            opa
           );
         }
       }
@@ -663,7 +732,7 @@ export default {
       this.listPointsPosType = [];
       this.clearStage(this.stage, this.layer);
       sessionStorage.removeItem("listPoints");
-      sessionStorage.removeItem("usedColor");
+      // sessionStorage.removeItem("usedColor");
     },
     /**
      * 10种颜色对应10类
@@ -709,16 +778,14 @@ export default {
         const x = Math.round(Pos.x);
         const y = Math.round(Pos.y);
         console.log(x, y);
-        this.usedColor.add(this.currentColor);
+        // this.usedColor.add(this.currentColor);
         // console.log("this.usedColor:", this.usedColor);
 
         if (this.statusAdd) {
-          var type = this.typeOfColor(this.currentColor);
+          // var type = this.typeOfColor(this.currentColor);
           this.listPointsPosType.push({
             pos: [x, y],
-            color: this.currentColor,
-            type: type,
-            classes: this.usedColor.size
+            color: this.currentColor
           });
 
           // 在添加状态，只画最后加进list的 点
@@ -800,6 +867,12 @@ export default {
       if (val == "逻辑回归") {
         this.colorTypeArr = [0, 1]; // 当这个arr只有2个元素时
       }
+    },
+    isCompareOptimizer(val) {
+      console.log("isCompareOptimizer变化为：", val);
+      if (val == true) {
+        this.compareOptimizer();
+      }
     }
   }
 };
@@ -809,13 +882,16 @@ export default {
 .demo {
   .demo-large {
     display: flex;
-    // justify-content: space-around;
+    // justify-content: space-evenly;
     .demo-large-left {
       flex: 1 1 auto;
     }
     .demo-model {
       flex: 1 1 auto;
-      // margin-right: 10px;
+      // margin-right: 2%;
+    }
+    .no-use {
+      flex: 0.3 10 auto;
     }
   }
   .demo-model {

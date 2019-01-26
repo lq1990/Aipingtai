@@ -52,8 +52,8 @@ Common.prototype = {
    * inputX: Features, inputX会被不断改造，直到最终输入给model，格式
    * inputY: Labels, 多行1列
    */
-  inputCS2Mat: function() {
-    var { X, Y } = this.canvas2MLmat(this.inputTrainRaw);
+  inputCS2Mat: function(usedColorList) {
+    var { X, Y } = this.canvas2MLmat(this.inputTrainRaw, usedColorList);
     this.inputX = X;
     this.inputY = Y;
     return this;
@@ -64,8 +64,8 @@ Common.prototype = {
    * inputX 被改为：第一列都是1，剩下2列是 Features
    * inputY 多行 3列，如果是3分类问题的话，onehot格式
    */
-  inputCS2MatXOneHotY: function() {
-    var { X, Y } = this.canvas2MLmatOneHot(this.inputTrainRaw);
+  inputCS2MatXOneHotY: function(usedColorList) {
+    var { X, Y } = this.canvas2MLmatOneHot(this.inputTrainRaw, usedColorList);
     this.inputX = X;
     this.inputY = Y;
     return this;
@@ -77,8 +77,9 @@ Common.prototype = {
    * 输出 inputY 多行3列（3类的话） 都是 math.matrix格式
    * @param {*} inputTrainRaw
    */
-  canvas2MLmatOneHot: function(inputTrainRaw) {
-    var classes = inputTrainRaw[inputTrainRaw.length - 1].classes;
+  canvas2MLmatOneHot: function(inputTrainRaw, usedColorList) {
+    // var num_classes = inputTrainRaw[inputTrainRaw.length - 1].classes;
+    var num_classes = usedColorList.length;
 
     var xArr = [];
     var yArr = [];
@@ -86,9 +87,10 @@ Common.prototype = {
       var pos = item.pos;
       xArr.push(pos);
 
-      var type0 = this.labelOfType(item.type); // 输出为 [0],[1],[2],...
-      var type = type0[0]; // 0,1,2,3,...
-      var zeros = this.zerosOne(classes, type);
+      // 类别 根据当前的颜色在usedColorList中的位置来决定。
+      var type = usedColorList.indexOf(item.color);
+
+      var zeros = this.zerosOne(num_classes, type);
       yArr.push(zeros);
     });
 
@@ -294,35 +296,6 @@ Common.prototype = {
     var out = math.dotDivide(num, den);
     return out;
   },
-  /**
-   * canvas过来的json数据中有个type，对应于10类
-   */
-  labelOfType: function(type) {
-    switch (type) {
-      case "A":
-        return [0];
-      case "B":
-        return [1];
-      case "C":
-        return [2];
-      case "D":
-        return [3];
-      case "E":
-        return [4];
-      case "F":
-        return [5];
-      case "G":
-        return [6];
-      case "H":
-        return [7];
-      case "I":
-        return [8];
-      case "J":
-        return [9];
-      default:
-        return null;
-    }
-  },
 
   /**
    * 输入：canvas过来的数据，格式：[ {pos: [x, 1], type:"", color: ""}, {},...]
@@ -331,10 +304,10 @@ Common.prototype = {
    * 1. 输出X：Features, [[1,x,y],[1,x,y],...]
    * 2. 输出Y: Labels, [[0],[1],...]
    */
-  canvas2MLmat: function(canvasData) {
+  canvas2MLmat: function(canvasData, usedColorList) {
     // canvasData: 从canvas过来的数据格式：
     // [
-    // { pos: [x, y], type: "A", color: "" },
+    // { pos: [x, y], color: "" },
     // {},
     // {},
     // ...
@@ -346,9 +319,9 @@ Common.prototype = {
     var Y0 = new Array();
     canvasData.forEach(item => {
       var pos = item.pos;
-      var type = item.type;
+      let type = usedColorList.indexOf(item.color); // 返回itemcolor在 colorlist中位置，位置当做类别
       X0.push(pos);
-      Y0.push(this.labelOfType(type));
+      Y0.push([type]);
     });
     var X = math.concat(math.ones(X0.length, 1), X0);
     var Y = math.matrix(Y0);
@@ -405,7 +378,7 @@ Optimizer.prototype = {
 
     this.pho = 0.9;
     this.epsilon = 10 ** -8;
-    var W;
+    let W;
     // 最开始第一步时，gt_1Arr是空的，用标准梯度下降法.
     if (gt_1Arr.length == 0) {
       W = this.GradientDescent(oldW, stepSize, gt);
@@ -420,6 +393,21 @@ Optimizer.prototype = {
     W = math.add(oldW, dxt);
     return W;
   },
+
+  RMSProp_new: function(oldW, stepSize, dCdW, dCdWArr, gxLen) {
+    // RMSProp
+    let W = this.RMSProp(oldW, stepSize, dCdW, dCdWArr); // 多行1列
+    // console.log("==================dCdW.valueOf():", dCdW.valueOf());
+    dCdWArr.push(dCdW.valueOf());
+
+    // dCdW不需要存储所有值钱的梯度，只用前几个。
+    while (dCdWArr.length > gxLen) {
+      dCdWArr.shift();
+    }
+
+    return W;
+  },
+
   /**
    * Adadelta 从 Adagrad, RMSProp 升级而来;
    * Adadelta 不需要设置初始学习率，自适应;
@@ -475,6 +463,23 @@ Optimizer.prototype = {
     var W = math.add(oldW, dxt);
     return { W: W, dW: dxt };
   },
+
+  Adadelta_new: function(oldW, stepSize, dCdW, dCdWArr, dWArr, gxLen) {
+    var obj = this.Adadelta(oldW, stepSize, dCdW, dCdWArr, dWArr);
+    let W = obj.W;
+    var dW = obj.dW;
+
+    dCdWArr.push(dCdW.valueOf());
+    while (dCdWArr.length > gxLen) {
+      dCdWArr.shift();
+    }
+
+    dWArr.push(dW.valueOf());
+    while (dWArr.length > gxLen) {
+      dWArr.shift();
+    }
+    return W;
+  },
   /**
    * 计算RMS为 rmsProp, adadelta 服务。
    * 1. E[ g^2 ]_ t = pho * E[ g^2 ]_ (t-1) + (1-pho)*(g_t)^2
@@ -485,24 +490,47 @@ Optimizer.prototype = {
    * @param {*} epsilon 最小值 1e-8, 防止分母为0
    */
   calcRMSgt: function(curGt, beforeGArr, pho, epsilon) {
+    // 求 beforeGArr中 数据每一个位置的均值，即 math.add() / num
+    var sum = 0;
+    beforeGArr.forEach(item => {
+      let item2 = math.dotPow(item, 2); // 先平方
+      sum = math.add(sum, item2); // 求和
+    });
+    // 求均值
+    var mean_beforeGArr2 = math.dotDivide(sum, beforeGArr.length);
+
+    var g2t = math.dotPow(curGt, 2); // 当前gt的平方。 结果 3行1列
+
+    // var E_g2t = this.pho * E_g2t_1 + (1 - this.pho) * g2t;
+    var E_g2t = math.add(
+      math.dotMultiply(pho, mean_beforeGArr2),
+      math.dotMultiply(math.subtract(1, pho), g2t)
+    );
+    var rms_gt = math.sqrt(math.add(E_g2t, epsilon));
+
+    /*
     var len = curGt.size()[0];
+    // console.log("==beforeGArr:", beforeGArr, typeof beforeGArr);
+    // console.log("===beforeGArr.length:", beforeGArr.length);
+    // console.log("===len:", len);
     // 因为 math.matrix格式的原因，gt_1Arr内数据格式：多个 3行1列。
     // 为了计算 E[g^2]_(t-1) 的值，求 pow、mean elemetwise。就要借助于 reshape
     var g2t_1 = math.dotPow(math.matrix(beforeGArr), 2);
+    // console.log("===g2t_1:", g2t_1);
     var g2t_1_reshape = math.reshape(g2t_1, [beforeGArr.length, len]); // reshape原因是：把三维的数组变成二维的。
+    // console.log("====g2t_1_reshape:", g2t_1_reshape);
     var E_g2t_1_old = math.mean(g2t_1_reshape, 0);
     var E_g2t_1 = math.reshape(E_g2t_1_old, [len, 1]); // 前几个 g的平方的平均值（不算当前gt）。结果 3行1列
-    // console.log("E_g2t_1:", E_g2t_1);
 
     var g2t = math.dotPow(curGt, 2); // 当前gt的平方。 结果 3行1列
-    // console.log("g2t:", g2t);
-    // console.log("this.pho:", this.pho);
+
     // var E_g2t = this.pho * E_g2t_1 + (1 - this.pho) * g2t;
     var E_g2t = math.add(
       math.dotMultiply(pho, E_g2t_1),
       math.dotMultiply(math.subtract(1, pho), g2t)
     );
     var rms_gt = math.sqrt(math.add(E_g2t, epsilon));
+    */
     return rms_gt;
   }
 };
@@ -549,8 +577,8 @@ LogReg.prototype.modelTrainCV = function(
   this.stepSize = stepSize || 0.1;
   this.stepTotal = stepTotal || 100;
   this.optimizer = optimizer || "GD";
-  this.isLogW = isLogW || false;
-  this.gxLen = gxLen || 100;
+  this.isLogW = isLogW || true;
+  this.gxLen = gxLen || 50;
   var X = this.inputX;
   var Y = this.inputY;
   // 初始化
@@ -573,31 +601,36 @@ LogReg.prototype.modelTrainCV = function(
       // W = math.subtract(W, math.multiply(this.stepSize, dCdW));
       W = this.GradientDescent(W, this.stepSize, dCdW);
     } else if (optimizer == "RMSProp" || optimizer == 1) {
-      // RMSProp
-      W = this.RMSProp(W, this.stepSize, dCdW, dCdWArr); // 多行1列
-      dCdWArr.push(dCdW.valueOf());
+      // 在次封装 RMSProp_new
+      W = this.RMSProp_new(W, this.stepSize, dCdW, dCdWArr, this.gxLen);
 
-      // dCdW不需要存储所有值钱的梯度，只用前几个。
-      while (dCdWArr.length > this.gxLen) {
-        dCdWArr.shift();
-      }
+      // // RMSProp
+      // W = this.RMSProp(W, this.stepSize, dCdW, dCdWArr); // 多行1列
+      // dCdWArr.push(dCdW.valueOf());
+
+      // // dCdW不需要存储所有值钱的梯度，只用前几个。
+      // while (dCdWArr.length > this.gxLen) {
+      // dCdWArr.shift();
+      // }
     } else if (optimizer == "Adadelta" || optimizer == 2) {
-      var obj = this.Adadelta(W, this.stepSize, dCdW, dCdWArr, dWArr);
-      W = obj.W;
-      var dW = obj.dW;
+      // 重新封装 Adadelta
+      W = this.Adadelta_new(W, this.stepSize, dCdW, dCdWArr, dWArr, this.gxLen);
 
-      dCdWArr.push(dCdW.valueOf());
-      while (dCdWArr.length > this.gxLen) {
-        dCdWArr.shift();
-      }
+      // var obj = this.Adadelta(W, this.stepSize, dCdW, dCdWArr, dWArr);
+      // W = obj.W;
+      // var dW = obj.dW;
 
-      dWArr.push(dW.valueOf());
-      while (dWArr.length > this.gxLen) {
-        dWArr.shift();
-      }
+      // dCdWArr.push(dCdW.valueOf());
+      // while (dCdWArr.length > this.gxLen) {
+      //   dCdWArr.shift();
+      // }
+
+      // dWArr.push(dW.valueOf());
+      // while (dWArr.length > this.gxLen) {
+      //   dWArr.shift();
+      // }
     }
     if (this.isLogW) {
-      // console.log("i: " + i + ", dCdWArr.length: " + dCdWArr.length);
       // 记录每一步
       this.logWval.push(W.valueOf());
     }
@@ -675,6 +708,7 @@ LogReg.prototype.calcCostArr = function(wArr, X, Y) {
 
     costArr.push(cost_mean);
   }
+  // console.log("costArr of LR:", costArr);
   return costArr;
 };
 
@@ -683,6 +717,7 @@ LogReg.prototype.calcOneCost = function(w, X, Y) {
   var left, right, temp1, temp2, cost;
   Z = math.multiply(X, w);
   H = this.sigmoid(Z);
+  // left = -Y * log(H)
   left = math.dotMultiply(math.multiply(-1, Y), math.log(H));
   // right = -(1-Y)*log(1-H)
   temp1 = math.subtract(Y, 1);
@@ -737,26 +772,11 @@ NN.prototype.softmax = function(inpZ) {
 };
 
 /**
- * 输入：onehot格式的 模型输出
- * 输出：分类的类别，"A", "B", "C",....。输出格式:普通list
- */
-NN.prototype.classesOfOneHotOutput = function(onehotMat) {
-  // var num_classes = onehotMat.size()[1];
-  var onehotArr = onehotMat.valueOf();
-  var classesArr = [];
-  onehotArr.forEach(item => {
-    var cl = this.classOfAOnehot(item);
-    classesArr.push(cl);
-  });
-  return classesArr;
-};
-/**
  * 将一个list中最大的数的 位置输出。
  * 1. 输入：普通list;
  * 2. 输出：类别，"A", "B",...
  */
-NN.prototype.classOfAOnehot = function(aOnehot) {
-  var classesStore = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+NN.prototype.classOfAOnehot = function(aOnehot, classesStore) {
   var maxOfRow = Math.max(...aOnehot);
   var idxOfMax = aOnehot.indexOf(maxOfRow); // 得到当前行最大数的位置，为num格式
   var cl = classesStore[idxOfMax];
@@ -808,9 +828,10 @@ NN.prototype.modelTrainCV = function(
   this.stepSize = stepSize || 0.1;
   this.stepTotal = stepTotal || 100;
   this.optimizer = optimizer || "GD";
-  this.lambda = lambda || 0.01; // 惩罚项的系数
+  this.lambda = lambda || 0; // 惩罚项的系数
   this.isLogW = isLogW || true;
-  this.gxLen = gxLen || 100;
+  this.gxLen = gxLen || 50;
+  // 为了 RMSProp, Adadelta 等优化器设置的，梯度计算时需要考虑到之前的梯度或dw 的个数。
 
   var X = this.inputX; // 多行2列，因为只有2个Features
   var XT = math.transpose(X);
@@ -819,12 +840,22 @@ NN.prototype.modelTrainCV = function(
   // 初始化 W,b
   var W = []; // 用 W 存储所有的w, [empty, [], [],...]
   var b = []; // 用 b 存储所有的b, [empty, [], [],...]
+  this.ALarr = []; // 存储每一步NN模型前向的输出 多行3列
   for (let i = 1; i < len_layerList; i++) {
     // 层数从 0开始计数，L0, L1, L2。
     W[i] = math.random([layerList[i - 1], layerList[i]], -1, 1);
     b[i] = math.random([1, layerList[i]], -1, 1); // b的维度：n行多列，n为样本数目
   }
 
+  // 迭代优化参数
+  var dCdW2Arr = []; // 记录每一步的 dCdW 即gt.
+  var dCdb2Arr = [];
+  var dCdW1Arr = [];
+  var dCdb1Arr = [];
+  var dW2Arr = [];
+  var db2Arr = [];
+  var dW1Arr = [];
+  var db1Arr = [];
   for (let i = 0; i < this.stepTotal; i++) {
     // ================= 前向传播 ====================
     // 输入为 X
@@ -837,7 +868,6 @@ NN.prototype.modelTrainCV = function(
       this.extendArr(math.matrix(b[1]), 0, X.size()[0])
     ); // (n,4)
     var A1 = this.sigmoid(Z1); // (n,4)
-    // console.log("A1:", A1);
 
     // L2
     // var Z2 = A1 * W[2] + b[2];
@@ -846,8 +876,8 @@ NN.prototype.modelTrainCV = function(
       this.extendArr(math.matrix(b[2]), 0, X.size()[0])
     ); // (n,3)
     var A2 = this.softmax(Z2); // (n,3)
+    this.ALarr.push(A2);
     // softmax输出为概率
-    // console.log("A2:", A2);
 
     // ================== 反向传播 =========================
     var A1T = math.transpose(A1);
@@ -858,24 +888,17 @@ NN.prototype.modelTrainCV = function(
     // console.log("delta2:", delta2);
 
     // 尝试2 ==========================
-    // console.log("A2:", A2);
-
     // =================传播的起点，核心 ===
     var delta2 = math.subtract(A2, Y); // 这是对的了。正确的类别位置减一，其它位置不变。
 
-    // console.log("delta2_temp:", delta2_temp);
-    // var delta2 = math.dotMultiply(Y, delta2_temp);
-    // console.log("delta2:", delta2);
-    //
-
     // var dW2 = A1T * delta2 + lambda * W[2];
-    var dW2 = math.add(
+    var dCdW2 = math.add(
       math.multiply(A1T, delta2),
       math.dotMultiply(this.lambda, W[2])
     ); // (4,3)
     // var db2 = delta2; // (n,3)
-    var db2 = math.sum(delta2, 0);
-    math.reshape(db2, [1, db2.size()[0]]);
+    var dCdb2 = math.sum(delta2, 0);
+    math.reshape(dCdb2, [1, dCdb2.size()[0]]);
 
     // var delta1 = delta2 * W2T .* ( sz1*(1-sz1) );
     var delta1_left = math.multiply(delta2, math.transpose(W[2])); // (n,3)(3,4)=(n,4)
@@ -887,91 +910,101 @@ NN.prototype.modelTrainCV = function(
     var delta1 = math.dotMultiply(delta1_left, delta1_right); // (n,4)
     // console.log("delta1:", delta1);
     // var dW1 = XT * delta1 + lambda * W[1];
-    var dW1 = math.add(
+    var dCdW1 = math.add(
       math.multiply(XT, delta1), // (2,n)(n,4)=(2,4)
       math.multiply(this.lambda, W[1]) // (2,4)
     ); // (2,4)
     // var db1 = delta1; // (n,4)
-    var db1 = math.sum(delta1, 0);
-    math.reshape(db1, [1, db1.size()[0]]);
-
-    // console.log("dW2:", dW2);
-    // console.log("db2:", db2);
-    // console.log("dW1:", dW1);
-    // console.log("db1:", db1);
+    var dCdb1 = math.sum(delta1, 0);
+    math.reshape(dCdb1, [1, dCdb1.size()[0]]);
 
     // ============== 更新 W，b ==================
-    // W -= this.stepSize * dW
-    // console.log("W[2]:", W[2]);
-    W[2] = math.subtract(W[2], math.multiply(this.stepSize, dW2));
-    b[2] = math.subtract(b[2], math.multiply(this.stepSize, db2));
-    W[1] = math.subtract(W[1], math.multiply(this.stepSize, dW1));
-    b[1] = math.subtract(b[1], math.multiply(this.stepSize, db1));
-    // console.log("W[2]:", W[2]);
+
+    if (this.optimizer == "GD" || this.optimizer == 0) {
+      // console.log("当前优化器 GD");
+      W[2] = this.GradientDescent(W[2], this.stepSize, dCdW2);
+      b[2] = this.GradientDescent(b[2], this.stepSize, dCdb2);
+      W[1] = this.GradientDescent(W[1], this.stepSize, dCdW1);
+      b[1] = this.GradientDescent(b[1], this.stepSize, dCdb1);
+    } else if (this.optimizer == "RMSProp" || this.optimizer == 1) {
+      // console.log("当前优化器 RMSProp new", i);
+      W[2] = this.RMSProp_new(W[2], this.stepSize, dCdW2, dCdW2Arr, this.gxLen);
+      b[2] = this.RMSProp_new(b[2], this.stepSize, dCdb2, dCdb2Arr, this.gxLen);
+      W[1] = this.RMSProp_new(W[1], this.stepSize, dCdW1, dCdW1Arr, this.gxLen);
+      b[1] = this.RMSProp_new(b[1], this.stepSize, dCdb1, dCdb1Arr, this.gxLen);
+    } else if (this.optimizer == "Adadelta" || this.optimizer == 2) {
+      W[2] = this.Adadelta_new(
+        W[2],
+        this.stepSize,
+        dCdW2,
+        dCdW2Arr,
+        dW2Arr,
+        this.gxLen
+      );
+      b[2] = this.Adadelta_new(
+        b[2],
+        this.stepSize,
+        dCdb2,
+        dCdb2Arr,
+        db2Arr,
+        this.gxLen
+      );
+      W[1] = this.Adadelta_new(
+        W[1],
+        this.stepSize,
+        dCdW1,
+        dCdW1Arr,
+        dW1Arr,
+        this.gxLen
+      );
+      b[1] = this.Adadelta_new(
+        b[1],
+        this.stepSize,
+        dCdb1,
+        dCdb1Arr,
+        db1Arr,
+        this.gxLen
+      );
+    }
   }
-  // console.log("Z2:", Z2);
   // console.log("A2:", A2);
-  // console.log("W[2]:", W[2]);
-  // console.log("b[2]:", b[2]);
-  // console.log("W[1]:", W[1]);
-  // console.log("b[1]:", b[1]);
-
-  // 计算下在这个 W，b，所得模型的输出
-
+  // console.log(this.optimizer);
   this.W = W;
   this.b = b;
-  // this.logWval = [W.valueOf()]; // 记录W的变化，从初始值开始记录
-  // // 迭代优化求W
-  // var dCdWArr = []; // 记录每一步的 dCdW 即gt.
-  // var dWArr = []; // 记录 dW，为 Adadelta用。
-  // for (var i = 0; i < this.stepTotal; i++) {
-  //   var Z = math.multiply(X, W); // Z = XW
 
-  //   var H = this.sigmoid(Z);
-  //   var HminusY = math.subtract(H, Y);
-  //   var dCdW = math.multiply(XT, HminusY); // 不同ML算法得到的 dCdW 不同。
-  //   // console.log("dCdW:", dCdW);
-
-  //   if (optimizer == "GD" || optimizer == 0) {
-  //     // 使用传统的梯度下降法, W -= alpha * dCdW
-  //     // W = math.subtract(W, math.multiply(this.stepSize, dCdW));
-  //     W = this.GradientDescent(W, this.stepSize, dCdW);
-  //   } else if (optimizer == "RMSProp" || optimizer == 1) {
-  //     // RMSProp
-  //     W = this.RMSProp(W, this.stepSize, dCdW, dCdWArr); // 多行1列
-  //     dCdWArr.push(dCdW.valueOf());
-
-  //     // dCdW不需要存储所有值钱的梯度，只用前几个。
-  //     while (dCdWArr.length > this.gxLen) {
-  //       dCdWArr.shift();
-  //     }
-  //   } else if (optimizer == "Adadelta" || optimizer == 2) {
-  //     var obj = this.Adadelta(W, this.stepSize, dCdW, dCdWArr, dWArr);
-  //     W = obj.W;
-  //     var dW = obj.dW;
-
-  //     dCdWArr.push(dCdW.valueOf());
-  //     while (dCdWArr.length > this.gxLen) {
-  //       dCdWArr.shift();
-  //     }
-
-  //     dWArr.push(dW.valueOf());
-  //     while (dWArr.length > this.gxLen) {
-  //       dWArr.shift();
-  //     }
-  //   }
-  //   if (this.isLogW) {
-  //     // console.log("i: " + i + ", dCdWArr.length: " + dCdWArr.length);
-  //     // 记录每一步
-  //     this.logWval.push(W.valueOf());
-  //   }
-  // }
-  // this.optW = W;
-  // this.optWval = W.valueOf();
-  // this.optWdetails = this.calcWdetails(this.optWval);
   return this;
 };
+/**
+ * 有了模型的softmax输出的关于概率数据的矩阵后，使用 -log 计算cost
+ * @param ALarr 模型的输出 作为这里的输入，多行3列，若3类的话。
+ * @param Y Labels，onehot格式
+ * @returns 输出每一个迭代步所对应的 cost
+ */
+NN.prototype.calcCostArr = function(ALarr, Y) {
+  // cost = -log(ALi)
+  let costArr = [];
+  // console.log("ALarr:", ALarr);
+  // console.log("Y:", Y);
+  ALarr.forEach(item => {
+    // console.log("item.valueOf():", item.valueOf());
+    let cost_mean = this.calcOneCost(item, Y);
+    costArr.push(cost_mean);
+  });
 
+  return costArr;
+};
+NN.prototype.calcOneCost = function(AL, Y) {
+  // 先对AL -log
+  var minuslogAL = math.multiply(-1, math.log(AL));
+  var minuslogALy = math.dotMultiply(Y, minuslogAL);
+  var cost_mean = math.mean(minuslogALy);
+
+  // let hy = math.dotMultiply(AL, Y);
+  // console.log("hy:", hy);
+  // let cost = math.dotMultiply(-1, math.log(hy));
+  // let cost_mean = math.mean(cost);
+  return cost_mean;
+};
 // ========================================================================
 // ========================== 导出 ========================================
 // ========================================================================
