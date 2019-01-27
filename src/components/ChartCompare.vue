@@ -36,7 +36,7 @@ export default {
 
     let ret = {
       title: {
-        text: "对比使用不同优化器时的损失值变化"
+        text: "对比不同优化器时的损失值"
       },
       legend: {
         x: "right",

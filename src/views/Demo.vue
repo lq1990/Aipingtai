@@ -183,7 +183,8 @@ export default {
       "curOptimizer",
       "lambda",
       "drawInterval",
-      "isCompareOptimizer"
+      "isCompareOptimizer",
+      "hiddenLayerList"
     ])
   },
   data() {
@@ -391,7 +392,7 @@ export default {
       // console.log("usedColor:", this.usedColor, typeof this.usedColor);
     },
 
-    handleRun(e) {
+    handleRun() {
       // 运行时，先把chart关闭
       this.isShowChart = false;
       // this.isCompareOptimizer = false;
@@ -424,14 +425,14 @@ export default {
           this.curOptimizer
         );
       } else if (this.curAlg == "神经网络") {
-        console.log("当前运行的是：" + this.curAlg);
+        // 使用 hiddenLayerList 对 layerList 改变
+        let layerList = [2, ...this.hiddenLayerList, usedColorList.length];
+        console.log(
+          "当前运行的是：" + this.curAlg + ", layerList: " + layerList
+        );
 
-        // console.log("usedColor size: ", this.usedColor.size);
-        // console.log("this.usedColor:", this.usedColor);
-        // var classes = this.listPointsPosType[this.listPointsPosType.length - 1]
-        //   .classes;
         this.NNDrawColorArea(
-          [2, Math.max(usedColorList.length * 2, 6), usedColorList.length],
+          layerList,
           this.stepSize,
           this.stepTotal,
           this.curOptimizer,
@@ -596,6 +597,7 @@ export default {
           var curMatNew = math.matrix([[colNew, rowNew]]);
 
           var onehot = nn.calcProbInFP(curMatNew, W, b);
+          // console.log("onehot:", onehot);
           var onehotList = onehot.valueOf()[0]; // list
           var onehotMaxProb = Math.max(...onehotList);
 
@@ -865,7 +867,9 @@ export default {
       // 监控 当前算法的变化，当切换到 逻辑回归时，只能做 2分类，所以只有2个颜色可用
       // console.log("watch curAlg", val);
       if (val == "逻辑回归") {
-        this.colorTypeArr = [0, 1]; // 当这个arr只有2个元素时
+        this.colorTypeArr = [0, 1];
+      } else {
+        this.colorTypeArr = [0, 1];
       }
     },
     isCompareOptimizer(val) {

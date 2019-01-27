@@ -9,7 +9,8 @@ export default {
     curOptimizer: "GD",
     lambda: 0, // 惩罚系数
     drawInterval: 20,
-    isCompareOptimizer: false
+    isCompareOptimizer: false,
+    hiddenLayerList: [6] // NN输入层、隐层、输出层 的元数目。
   },
   mutations: {
     changeCurAlg(state, payload) {
@@ -35,6 +36,9 @@ export default {
     },
     changeIsCompareOptimizer(state, payload) {
       state.isCompareOptimizer = payload;
+    },
+    changeHiddenLayerList(state, payload) {
+      state.hiddenLayerList = payload;
     }
   },
   getters: {

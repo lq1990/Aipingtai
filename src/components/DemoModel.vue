@@ -56,8 +56,10 @@
       <template v-if="curAlg=='神经网络'">
         <div class="hint">
           <span style="font-weight: bold">提示</span>：
-          当画布上只有一种颜色时，神经网络做<span style="background:#fd7d46;color:white">回归</span>，
-          否则做<span style="background:#fd7d46;color:white">分类</span>。
+          神经网络能做
+          <span style="background:#fd7d46;color:white">回归</span>
+          和
+          <span style="background:#fd7d46;color:white">分类</span>，取决于画布上颜色类别的数目。
         </div>
         <div class="params-render">
           <div class="params">
@@ -76,8 +78,22 @@
             <div class="params-items">惩罚系数：
               <el-input size="mini" class="input" v-model="lambda_temp"></el-input>
             </div>
-            <div class="params-items">结构一览</div>
-
+            <div class="params-items">隐藏层结构：
+              <el-button @click="delHiddenLayer" size="small" circle>减</el-button>
+              <el-button @click="addHiddenLayer" size="small" circle>加</el-button>
+              <el-input
+                size="mini"
+                class="input-multi"
+                v-for="(item,index) in hiddenLayerList"
+                :key="index"
+                :value="item"
+                :min="1"
+                :max="100"
+                type="number"
+                @blur="hiddenLayerListInputBlur(index)"
+                ref="layerInput"
+              ></el-input>
+            </div>
           </div>
 
           <div class="render">
@@ -129,7 +145,8 @@ export default {
       "curOptimizer",
       "lambda",
       "drawInterval",
-      "isCompareOptimizer"
+      "isCompareOptimizer",
+      "hiddenLayerList"
     ]),
     stepS: {
       get() {
@@ -178,6 +195,44 @@ export default {
     }
   },
   methods: {
+    hiddenLayerListInputBlur(index) {
+      let currentValue = Number(this.$refs.layerInput[index].currentValue);
+      let afterParseInt = parseInt(currentValue); // 如果前后不同，则不是整数
+      if (
+        currentValue <= 0 ||
+        currentValue > 100 ||
+        afterParseInt != currentValue
+      ) {
+        this.$message({
+          message: "请输入 0~100 之间的整数！",
+          type: "warning"
+        });
+        this.$refs.layerInput[index].focus();
+      }
+
+      let aList = this.hiddenLayerList.concat();
+      aList[index] = currentValue;
+      this.changeHiddenLayerList(aList);
+      this.saveParamsInStorage();
+
+      console.log("this.hiddenLayerList:", this.hiddenLayerList);
+    },
+    addHiddenLayer() {
+      // 从 vuex过来的数据不能直接修改，需要转一下。
+      let aList = this.hiddenLayerList.concat();
+      // 深拷贝，方法：.slice(), .concat(), [...a2]=a1
+      aList.push(6);
+      this.changeHiddenLayerList(aList);
+      console.log("this.hiddenLayerList:", this.hiddenLayerList);
+      this.saveParamsInStorage();
+    },
+    delHiddenLayer() {
+      let aList = this.hiddenLayerList.concat();
+      aList.pop();
+      this.changeHiddenLayerList(aList);
+      console.log("this.hiddenLayerList:", this.hiddenLayerList);
+      this.saveParamsInStorage();
+    },
     handleCompareOptimizer() {
       // 设置一个确认 弹框，提醒 ‘对比各个优化器并展示，将持续一会儿，确认继续吗？’
       this.$confirm(
@@ -191,7 +246,11 @@ export default {
         }
       )
         .then(() => {
-          this.changeIsCompareOptimizer(true);
+          setTimeout(() => {
+            // 设置 500毫秒 原因是，给对话框动画消失 时间。否则，一旦对比算法运行就卡了。
+            console.log("after 500ms...");
+            this.changeIsCompareOptimizer(true);
+          }, 500);
           // console.log("isCompareOptimizer: ", this.isCompareOptimizer);
         })
         .catch(() => {
@@ -207,7 +266,8 @@ export default {
       "changeCurOptimizer",
       "changeLambda",
       "changeDrawInterval",
-      "changeIsCompareOptimizer"
+      "changeIsCompareOptimizer",
+      "changeHiddenLayerList"
     ]),
     handleCardChange(cur) {
       // (cur, old) 传入参数为 索引
@@ -230,6 +290,7 @@ export default {
       this.changeCurOptimizer("GD");
       this.changeLambda(0);
       this.changeDrawInterval(20);
+      this.changeHiddenLayerList([6]);
 
       this.saveParamsInStorage();
     },
@@ -241,7 +302,8 @@ export default {
         stepTotal: this.stepTotal,
         curOptimizer: this.curOptimizer,
         lambda: this.lambda,
-        drawInterval: this.drawInterval
+        drawInterval: this.drawInterval,
+        hiddenLayerList: this.hiddenLayerList
       };
       sessionStorage.setItem("paramsObj", JSON.stringify(paramsObj));
       // console.log("paramsObj:", paramsObj);
@@ -283,6 +345,12 @@ export default {
       } else {
         this.changeDrawInterval(this.drawInterval);
       }
+
+      if (paramsObj.hiddenLayerList) {
+        this.changeHiddenLayerList(paramsObj.hiddenLayerList);
+      } else {
+        this.changeHiddenLayerList(this.hiddenLayerList);
+      }
     }
   },
   mounted() {
@@ -318,6 +386,11 @@ export default {
         .input {
           width: 100px;
           display: inline-block;
+        }
+        .input-multi {
+          width: 45px;
+          display: inline-block;
+          margin-left: 10px;
         }
       }
     }
@@ -367,7 +440,23 @@ export default {
   border-color: #ff9f44 !important;
 }
 .el-button--warning:active {
-  background-color: #faa555 !important;
+  background-color: #ff9f44 !important;
   border-color: #ff9f44 !important;
+}
+
+.el-button--small.is-circle:focus,
+.el-button--small.is-circle:hover {
+  background-color: #ff9f44 !important;
+  border-color: #ff9f44 !important;
+  color: #fff;
+}
+.el-button--small.is-circle:active {
+  background-color: #fd7d46 !important;
+  border-color: #fd7d46 !important;
+  color: #fff;
+}
+
+.el-input__inner {
+  padding: 0 0px 0 10px !important;
 }
 </style>

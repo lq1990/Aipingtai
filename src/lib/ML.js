@@ -61,8 +61,8 @@ Common.prototype = {
   /**
    * 为了多分类问题，使用 onehot.
    * 将canvas过来的数据转成 矩阵格式的inputX, onehot类型的 inputY
-   * inputX 被改为：第一列都是1，剩下2列是 Features
-   * inputY 多行 3列，如果是3分类问题的话，onehot格式
+   * inputX 2列，区别于lr中的3列。 Features
+   * inputY onehot格式, 多行 3列，如果是3分类问题的话，
    */
   inputCS2MatXOneHotY: function(usedColorList) {
     var { X, Y } = this.canvas2MLmatOneHot(this.inputTrainRaw, usedColorList);
@@ -397,11 +397,10 @@ Optimizer.prototype = {
   RMSProp_new: function(oldW, stepSize, dCdW, dCdWArr, gxLen) {
     // RMSProp
     let W = this.RMSProp(oldW, stepSize, dCdW, dCdWArr); // 多行1列
-    // console.log("==================dCdW.valueOf():", dCdW.valueOf());
-    dCdWArr.push(dCdW.valueOf());
+    dCdWArr.push(dCdW.valueOf()); // dCdWArr 刚开始时空的list，在迭代时记录了 梯度。
 
     // dCdW不需要存储所有值钱的梯度，只用前几个。
-    while (dCdWArr.length > gxLen) {
+    if (dCdWArr.length > gxLen) {
       dCdWArr.shift();
     }
 
@@ -789,18 +788,28 @@ NN.prototype.classOfAOnehot = function(aOnehot, classesStore) {
  * @param W
  * @param b 一行多列
  */
-NN.prototype.calcProbInFP = function(X, W, b) {
+NN.prototype.calcProbInFP = function(curX, W, b) {
   // Z1 = X*W + b
-  var Z1 = math.add(math.multiply(X, W[1]), b[1]); // (n,4)
-  // console.log("Z1:", Z1);
-  var A1 = this.sigmoid(Z1); // (n,4)
-  // console.log("A1:", A1);
+  // var Z1 = math.add(math.multiply(X, W[1]), b[1]); // (n,4)
+  // var A1 = this.sigmoid(Z1); // (n,4)
 
-  var Z2 = math.add(math.multiply(A1, W[2]), b[2]); // (n,3)
-  // console.log("Z2:", Z2);
-  var A2 = this.softmax(Z2); // (n,3)
-  // console.log("A2:", A2);
-  return A2;
+  // var Z2 = math.add(math.multiply(A1, W[2]), b[2]); // (n,3)
+  // var A2 = this.softmax(Z2); // (n,3)
+  // return A2;
+  let Z = [];
+  let A = [];
+  let len_layerList = this.layerList.length;
+  A[0] = curX;
+  for (let j = 1; j < len_layerList; j++) {
+    if (j < len_layerList - 1) {
+      Z[j] = math.add(math.multiply(A[j - 1], W[j]), b[j]);
+      A[j] = this.sigmoid(Z[j]);
+    } else {
+      Z[j] = math.add(math.multiply(A[j - 1], W[j]), b[j]);
+      A[j] = this.softmax(Z[j]);
+    }
+  }
+  return A[A.length - 1];
 };
 
 /**
@@ -840,135 +849,205 @@ NN.prototype.modelTrainCV = function(
   // 初始化 W,b
   var W = []; // 用 W 存储所有的w, [empty, [], [],...]
   var b = []; // 用 b 存储所有的b, [empty, [], [],...]
-  this.ALarr = []; // 存储每一步NN模型前向的输出 多行3列
+  var ZStore = []; // 存储 Z1, Z2,...
+  var AStore = []; // 存储 A1, A2,...
+  var ATStore = []; // 存储转置，A1T, A2T,...
+  var dCdWStore = []; // 存储之前的所有 dCdW1, dCdW2, ...
+  var dCdbStore = [];
+  var dWStore = []; // 存储之前的 dW1, dW2, ...
+  var dbStore = [];
+  var deltaStore = []; // delta1, delta2,....
+  var dCdWCur = []; // 当前计算的，dCdW1, dCdW2,...
+  var dCdbCur = [];
+  this.ALarr = []; // 存储每一步NN模型前向的输出 多行3列，用作计算cost
   for (let i = 1; i < len_layerList; i++) {
     // 层数从 0开始计数，L0, L1, L2。
     W[i] = math.random([layerList[i - 1], layerList[i]], -1, 1);
     b[i] = math.random([1, layerList[i]], -1, 1); // b的维度：n行多列，n为样本数目
+
+    // 初始化 Store，下面几个内的元素依然是 arr，所以需要初始化为arr，然后才能push
+    dCdWStore[i] = [];
+    dCdbStore[i] = [];
+    dWStore[i] = [];
+    dbStore[i] = [];
   }
-
+  AStore[0] = X;
+  ATStore[0] = XT;
   // 迭代优化参数
-  var dCdW2Arr = []; // 记录每一步的 dCdW 即gt.
-  var dCdb2Arr = [];
-  var dCdW1Arr = [];
-  var dCdb1Arr = [];
-  var dW2Arr = [];
-  var db2Arr = [];
-  var dW1Arr = [];
-  var db1Arr = [];
+  // var dCdW2Arr = []; // 记录每一步的 dCdW 即gt. 在 dCdWStore[2]
+  // var dCdb2Arr = []; // dCdbStore[2]
+  // var dCdW1Arr = []; // dCdWStore[1]
+  // var dCdb1Arr = []; // dCdbStore[1]
+
+  // var dW2Arr = []; // 记录了每一步迭代时，dW2, dWStore[2]
+  // var db2Arr = []; // dbStore[2]
+  // var dW1Arr = []; // dWStore[1]
+  // var db1Arr = []; // dbStore[1]
   for (let i = 0; i < this.stepTotal; i++) {
+    // 需要考虑当没有隐层时，直接softmax激活
     // ================= 前向传播 ====================
-    // 输入为 X
+    // layerList组成：输入层，隐层，输出层。
+    // 有无隐层需要不同对待。
+    if (len_layerList > 2) {
+      // FP 循环体内求出所有层的输出
+      for (let j = 1; j < len_layerList; j++) {
+        // 循环体内把值通过所有层算到了最后，输出softmax格式。
+        ZStore[j] = math.add(
+          math.multiply(AStore[j - 1], W[j]),
+          this.extendArr(math.matrix(b[j]), 0, AStore[j - 1].size()[0])
+        ); // (n,4)
 
-    // L1
-    // var Z1 = X * W[1] + b[1]; // (n,4)
-    // var b = this.extendArr(b[i],0,X.size()[0]);
-    var Z1 = math.add(
-      math.multiply(X, W[1]),
-      this.extendArr(math.matrix(b[1]), 0, X.size()[0])
-    ); // (n,4)
-    var A1 = this.sigmoid(Z1); // (n,4)
+        if (j < len_layerList - 1) {
+          // Z1 = X*W1+b1, A1 = sigmoid(Z1)
+          AStore[j] = this.sigmoid(ZStore[j]); // (n,4)
+        } else if (j == len_layerList - 1) {
+          AStore[j] = this.softmax(ZStore[j]); // (n,4)
+          this.ALarr.push(AStore[j]);
+        }
+      }
+      // BP 循环体内求出所有层的 更新梯度
+      for (let j = len_layerList - 1; j > 0; j--) {
+        if (j == len_layerList - 1) {
+          ATStore[j - 1] = math.transpose(AStore[j - 1]);
+          deltaStore[j] = math.subtract(AStore[j], Y);
+          dCdWCur[j] = math.add(
+            math.multiply(ATStore[j - 1], deltaStore[j]),
+            math.dotMultiply(this.lambda, W[j])
+          );
+          dCdbCur[j] = math.sum(deltaStore[j], 0);
+          math.reshape(dCdbCur[j], [1, dCdbCur[j].size()[0]]);
+        } else {
+          ATStore[j - 1] = math.transpose(AStore[j - 1]);
+          var delta1_left = math.multiply(
+            deltaStore[j + 1],
+            math.transpose(W[j + 1])
+          ); // (n,3)(3,4)=(n,4)
+          var sigmoid_Z1 = this.sigmoid(ZStore[j]); // (n,4)
+          var delta1_right = math.dotMultiply(
+            sigmoid_Z1,
+            math.subtract(1, sigmoid_Z1)
+          ); // (n,4)
+          deltaStore[j] = math.dotMultiply(delta1_left, delta1_right); // (n,4)
+          dCdWCur[j] = math.add(
+            math.multiply(ATStore[j - 1], deltaStore[j]), // (2,n)(n,4)=(2,4)
+            math.multiply(this.lambda, W[j]) // (2,4)
+          ); // (2,4)
+          dCdbCur[j] = math.sum(deltaStore[j], 0);
+          math.reshape(dCdbCur[j], [1, dCdbCur[j].size()[0]]);
+        }
+      }
+      // 更新参数
+      if (this.optimizer == "GD" || this.optimizer == 0) {
+        // console.log("当前优化器 GD");
+        for (let j = 1; j < len_layerList; j++) {
+          W[j] = this.GradientDescent(W[j], this.stepSize, dCdWCur[j]);
+          b[j] = this.GradientDescent(b[j], this.stepSize, dCdbCur[j]);
+        }
+      } else if (this.optimizer == "RMSProp" || this.optimizer == 1) {
+        // console.log("当前优化器 RMSProp new", i);
+        for (let j = 1; j < len_layerList; j++) {
+          W[j] = this.RMSProp_new(
+            W[j],
+            this.stepSize,
+            dCdWCur[j],
+            dCdWStore[j],
+            this.gxLen
+          );
+          b[j] = this.RMSProp_new(
+            b[j],
+            this.stepSize,
+            dCdbCur[j],
+            dCdbStore[j],
+            this.gxLen
+          );
+        }
+      } else if (this.optimizer == "Adadelta" || this.optimizer == 2) {
+        for (let j = 1; j < len_layerList; j++) {
+          W[j] = this.Adadelta_new(
+            W[j],
+            this.stepSize,
+            dCdWCur[j],
+            dCdWStore[j],
+            dWStore[j],
+            this.gxLen
+          );
+          b[j] = this.Adadelta_new(
+            b[j],
+            this.stepSize,
+            dCdbCur[j],
+            dCdbStore[j],
+            dbStore[j],
+            this.gxLen
+          );
+        }
+      }
+    } else {
+      // 当没有隐层时
+      // FP
+      ZStore[1] = math.add(
+        math.multiply(AStore[0], W[1]),
+        this.extendArr(math.matrix(b[1]), 0, AStore[0].size()[0])
+      ); // (n,4)
 
-    // L2
-    // var Z2 = A1 * W[2] + b[2];
-    var Z2 = math.add(
-      math.multiply(A1, W[2]),
-      this.extendArr(math.matrix(b[2]), 0, X.size()[0])
-    ); // (n,3)
-    var A2 = this.softmax(Z2); // (n,3)
-    this.ALarr.push(A2);
-    // softmax输出为概率
-
-    // ================== 反向传播 =========================
-    var A1T = math.transpose(A1);
-    // var delta2 = A2i - 1; // 注意此处是 label对应类处 才减一。 比如 [a,b-1,c] 第二类为label类，则只在第二类 减一。
-    // ============== ????? 此处很策略。 先减1，在和label elementwise 乘。 充分发挥label onehot矩阵用处。====================
-    // 尝试1
-    // var delta2 = math.dotMultiply(Y, math.subtract(A2, 1)); // (n,3)
-    // console.log("delta2:", delta2);
-
-    // 尝试2 ==========================
-    // =================传播的起点，核心 ===
-    var delta2 = math.subtract(A2, Y); // 这是对的了。正确的类别位置减一，其它位置不变。
-
-    // var dW2 = A1T * delta2 + lambda * W[2];
-    var dCdW2 = math.add(
-      math.multiply(A1T, delta2),
-      math.dotMultiply(this.lambda, W[2])
-    ); // (4,3)
-    // var db2 = delta2; // (n,3)
-    var dCdb2 = math.sum(delta2, 0);
-    math.reshape(dCdb2, [1, dCdb2.size()[0]]);
-
-    // var delta1 = delta2 * W2T .* ( sz1*(1-sz1) );
-    var delta1_left = math.multiply(delta2, math.transpose(W[2])); // (n,3)(3,4)=(n,4)
-    var sigmoid_Z1 = this.sigmoid(Z1); // (n,4)
-    var delta1_right = math.dotMultiply(
-      sigmoid_Z1,
-      math.subtract(1, sigmoid_Z1)
-    ); // (n,4)
-    var delta1 = math.dotMultiply(delta1_left, delta1_right); // (n,4)
-    // console.log("delta1:", delta1);
-    // var dW1 = XT * delta1 + lambda * W[1];
-    var dCdW1 = math.add(
-      math.multiply(XT, delta1), // (2,n)(n,4)=(2,4)
-      math.multiply(this.lambda, W[1]) // (2,4)
-    ); // (2,4)
-    // var db1 = delta1; // (n,4)
-    var dCdb1 = math.sum(delta1, 0);
-    math.reshape(dCdb1, [1, dCdb1.size()[0]]);
-
-    // ============== 更新 W，b ==================
-
-    if (this.optimizer == "GD" || this.optimizer == 0) {
-      // console.log("当前优化器 GD");
-      W[2] = this.GradientDescent(W[2], this.stepSize, dCdW2);
-      b[2] = this.GradientDescent(b[2], this.stepSize, dCdb2);
-      W[1] = this.GradientDescent(W[1], this.stepSize, dCdW1);
-      b[1] = this.GradientDescent(b[1], this.stepSize, dCdb1);
-    } else if (this.optimizer == "RMSProp" || this.optimizer == 1) {
-      // console.log("当前优化器 RMSProp new", i);
-      W[2] = this.RMSProp_new(W[2], this.stepSize, dCdW2, dCdW2Arr, this.gxLen);
-      b[2] = this.RMSProp_new(b[2], this.stepSize, dCdb2, dCdb2Arr, this.gxLen);
-      W[1] = this.RMSProp_new(W[1], this.stepSize, dCdW1, dCdW1Arr, this.gxLen);
-      b[1] = this.RMSProp_new(b[1], this.stepSize, dCdb1, dCdb1Arr, this.gxLen);
-    } else if (this.optimizer == "Adadelta" || this.optimizer == 2) {
-      W[2] = this.Adadelta_new(
-        W[2],
-        this.stepSize,
-        dCdW2,
-        dCdW2Arr,
-        dW2Arr,
-        this.gxLen
+      AStore[1] = this.softmax(ZStore[1]); // (n,4)
+      this.ALarr.push(AStore[1]);
+      // BP
+      ATStore[0] = math.transpose(AStore[0]);
+      deltaStore[1] = math.subtract(AStore[1], Y);
+      dCdWCur[1] = math.add(
+        math.multiply(ATStore[0], deltaStore[1]),
+        math.dotMultiply(this.lambda, W[1])
       );
-      b[2] = this.Adadelta_new(
-        b[2],
-        this.stepSize,
-        dCdb2,
-        dCdb2Arr,
-        db2Arr,
-        this.gxLen
-      );
-      W[1] = this.Adadelta_new(
-        W[1],
-        this.stepSize,
-        dCdW1,
-        dCdW1Arr,
-        dW1Arr,
-        this.gxLen
-      );
-      b[1] = this.Adadelta_new(
-        b[1],
-        this.stepSize,
-        dCdb1,
-        dCdb1Arr,
-        db1Arr,
-        this.gxLen
-      );
+      dCdbCur[1] = math.sum(deltaStore[1], 0);
+      math.reshape(dCdbCur[1], [1, dCdbCur[1].size()[0]]);
+      // update params
+      if (this.optimizer == "GD" || this.optimizer == 0) {
+        // console.log("当前优化器 GD");
+        for (let j = 1; j < len_layerList; j++) {
+          W[j] = this.GradientDescent(W[j], this.stepSize, dCdWCur[j]);
+          b[j] = this.GradientDescent(b[j], this.stepSize, dCdbCur[j]);
+        }
+      } else if (this.optimizer == "RMSProp" || this.optimizer == 1) {
+        // console.log("当前优化器 RMSProp new", i);
+        for (let j = 1; j < len_layerList; j++) {
+          W[j] = this.RMSProp_new(
+            W[j],
+            this.stepSize,
+            dCdWCur[j],
+            dCdWStore[j],
+            this.gxLen
+          );
+          b[j] = this.RMSProp_new(
+            b[j],
+            this.stepSize,
+            dCdbCur[j],
+            dCdbStore[j],
+            this.gxLen
+          );
+        }
+      } else if (this.optimizer == "Adadelta" || this.optimizer == 2) {
+        for (let j = 1; j < len_layerList; j++) {
+          W[j] = this.Adadelta_new(
+            W[j],
+            this.stepSize,
+            dCdWCur[j],
+            dCdWStore[j],
+            dWStore[j],
+            this.gxLen
+          );
+          b[j] = this.Adadelta_new(
+            b[j],
+            this.stepSize,
+            dCdbCur[j],
+            dCdbStore[j],
+            dbStore[j],
+            this.gxLen
+          );
+        }
+      }
     }
   }
   // console.log("A2:", A2);
-  // console.log(this.optimizer);
   this.W = W;
   this.b = b;
 
@@ -994,6 +1073,8 @@ NN.prototype.calcCostArr = function(ALarr, Y) {
   return costArr;
 };
 NN.prototype.calcOneCost = function(AL, Y) {
+  // lost = -y*log(h) - (1-y)*log(1-h) 但考虑到 一行中 概率和为1，
+  // 故可简化为只考虑真实类别位置，求 -log(ALi)
   // 先对AL -log
   var minuslogAL = math.multiply(-1, math.log(AL));
   var minuslogALy = math.dotMultiply(Y, minuslogAL);
