@@ -184,7 +184,8 @@ export default {
       "lambda",
       "drawInterval",
       "isCompareOptimizer",
-      "hiddenLayerList"
+      "hiddenLayerList",
+      "optimizerArr"
     ])
   },
   data() {
@@ -243,41 +244,52 @@ export default {
   methods: {
     ...mapMutations("demo", ["changeIsCompareOptimizer", "changeCurOptimizer"]),
     compareOptimizer() {
+      // 对比优化器时，不必泛化着色。
+      // 流程：input，scaling，3*（modeltrain + calccost），画图
       this.compareOptimizerCostArr = [];
+      this.isShowChart = false;
+      // this.changeIsCompareOptimizer(false);
+      // usedColor用于区分数据类别
+      let usedColorSet = new Set();
+      this.listPointsPosType.forEach(item => {
+        let itemColor = item.color;
+        usedColorSet.add(itemColor);
+      });
+      let usedColorList = Array.from(usedColorSet);
+      // NN的输入、隐层、输出层
+      let layerList = [2, ...this.hiddenLayerList, usedColorList.length];
+      // 使用模型
+      let nn = new ML.NN();
+      nn.inputTrainRaw(this.listPointsPosType)
+        .inputCS2MatXOneHotY(usedColorList)
+        .featureScaling();
+      // 切换优化器
+      for (let i = 0; i < this.optimizerArr.length; i++) {
+        this.changeCurOptimizer(this.optimizerArr[i]);
+        console.log("对比" + this.curOptimizer + "...");
+        let res = nn.modelTrainCV(
+          layerList,
+          this.stepSize,
+          this.stepTotal,
+          this.curOptimizer,
+          this.lambda
+        );
 
-      this.changeCurOptimizer("GD");
-      this.handleRun();
-      this.costArr = this.calcCostArr(
-        this.logWval,
-        this.inputX,
-        this.inputY,
-        this.ALarr
-      );
-      this.compareOptimizerCostArr.push(this.costArr);
+        this.ALarr = res.ALarr;
+        this.inputY = res.inputY;
+        this.costArr = this.calcCostArr(
+          this.logWval,
+          this.inputX,
+          this.inputY,
+          this.ALarr
+        );
+        // 存储不同优化器得出的cost
+        this.compareOptimizerCostArr.push(this.costArr);
+      }
 
-      this.changeCurOptimizer("RMSProp");
-      this.handleRun();
-      this.costArr = this.calcCostArr(
-        this.logWval,
-        this.inputX,
-        this.inputY,
-        this.ALarr
-      );
-      this.compareOptimizerCostArr.push(this.costArr);
-
-      this.changeCurOptimizer("Adadelta");
-      this.handleRun(); // 在run时，把 isCompareOptimizer 关闭了
-      this.costArr = this.calcCostArr(
-        this.logWval,
-        this.inputX,
-        this.inputY,
-        this.ALarr
-      );
-      this.compareOptimizerCostArr.push(this.costArr);
-
-      this.changeIsCompareOptimizer(true); // 再打开
-
-      console.log("compareOptimizerCostArr:", this.compareOptimizerCostArr);
+      // this.changeIsCompareOptimizer(true); // 再打开
+      console.log("对比结束！");
+      // console.log("compareOptimizerCostArr:", this.compareOptimizerCostArr);
     },
     handleClearColor() {
       this.clearStage(this.stage, this.layer);
@@ -395,8 +407,6 @@ export default {
     handleRun() {
       // 运行时，先把chart关闭
       this.isShowChart = false;
-      // this.isCompareOptimizer = false;
-      this.changeIsCompareOptimizer(false);
       // 点击run时，首先遍历所有的点数据，确定有多少类。可避免是有 全局变量 usedColor
       // 只有一类则做回归
       // 多类时做分类。
@@ -874,7 +884,7 @@ export default {
     },
     isCompareOptimizer(val) {
       console.log("isCompareOptimizer变化为：", val);
-      if (val == true) {
+      if (val) {
         this.compareOptimizer();
       }
     }

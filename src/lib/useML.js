@@ -28,11 +28,19 @@ var inp = [
   { pos: [70, 10], type: "B", color: "b" }
 ];
 
-// var layerList = [2, 4, 2];
+var linreg = new ML.LinReg();
+var res = linreg
+  .inputTrainRaw(inp)
+  .inputCS2Mat(2)
+  .featureScaling();
+console.log("res.inputY:", res.inputY);
+console.log("res.inputX:", res.inputX);
 
-var alg = 1;
+// var layerList = [2, 4, 2];
+var alg = 3;
+
 // 神经网络
-if (alg == 0) {
+if (alg == 2) {
   var nn = new ML.NN();
   var res = nn
     .inputTrainRaw(inp)

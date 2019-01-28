@@ -7,6 +7,7 @@ const math = require("mathjs");
 
 var ML = {
   Common: Common,
+  LinReg: LinReg,
   LogReg: LogReg,
   NN: NN
 };
@@ -533,8 +534,81 @@ Optimizer.prototype = {
     return rms_gt;
   }
 };
+
 // ========================================================================
-// =========================== LogReg =====================================
+// =========================== LinReg 线性回归 =============================
+// ========================================================================
+
+/**
+ * 线性回归中，只考虑点的 横纵坐标，不考虑颜色。但会对 feature进行扩充。
+ *
+ *    注：y ~ w为线性的，y~x非线性
+ *    y = w0 + w1 * x + w2*x² + ...
+ *    Y = X*W
+ *    W = (XT * X)^-1 * XT*Y
+ */
+function LinReg() {}
+
+for (let i in Common.prototype) {
+  LinReg.prototype[i] = Common.prototype[i];
+}
+
+for (let j in Optimizer.prototype) {
+  LinReg.prototype[j] = Optimizer.prototype[j];
+}
+
+/**
+ * 将原始来自canvas的输入改造成mat格式的 inputX, inputY.
+ * 在只有一个feature即x坐标 的前提下，人为进行feature扩充。
+ *
+ * @param orders 扩充到的阶数, x^0, x, x², x³, ...
+ */
+LinReg.prototype.inputCS2Mat = function(orders) {
+  this.orders = orders == 0 ? 0 : orders || 1;
+  let inp = this.inputTrainRaw;
+  let X1 = [];
+  let Y = [];
+  inp.forEach(item => {
+    let pos = item.pos;
+    let x = pos[0];
+    let y = pos[1];
+    X1.push(x);
+    Y.push(y);
+  });
+  let len_X1 = X1.length;
+  X1 = math.matrix(X1);
+  math.reshape(X1, [len_X1, 1]);
+
+  // 输出的是X，组合了 X0,X1,X2,...
+  let X = math.ones(len_X1, 1);
+  for (let i = 1; i <= this.orders; i++) {
+    X = math.concat(X.clone(), math.dotPow(X1, i));
+  }
+
+  Y = math.matrix(Y);
+  math.reshape(Y, [len_X1, 1]);
+  this.inputX = X;
+  this.inputY = Y;
+  return this;
+};
+
+/**
+ * 求解最优参数。
+ *  两种方法：
+ *  1. 一步到位，W = (XT * X + lambda*I)^-1 * XT * Y
+ *  2. 梯度下降。dCdW = XT * (XW - Y)
+ *
+ * sgd, mini-batch, batch 三方法中这里使用 batch，因为样本数目不多。
+ */
+LinReg.prototype.modelTrainCV = function() {};
+
+/**
+ * 泛化。
+ * 将计算出来的曲线画出来。
+ */
+LinReg.prototype.modelTest = function() {};
+// ========================================================================
+// =========================== LogReg 逻辑回归 =============================
 // ========================================================================
 /**
  * 流程如下：
@@ -846,7 +920,7 @@ NN.prototype.modelTrainCV = function(
   var XT = math.transpose(X);
   var Y = this.inputY; // 多行3列（若3类的话）
 
-  // 初始化 W,b
+  // 设置存储数据的list
   var W = []; // 用 W 存储所有的w, [empty, [], [],...]
   var b = []; // 用 b 存储所有的b, [empty, [], [],...]
   var ZStore = []; // 存储 Z1, Z2,...
@@ -860,6 +934,7 @@ NN.prototype.modelTrainCV = function(
   var dCdWCur = []; // 当前计算的，dCdW1, dCdW2,...
   var dCdbCur = [];
   this.ALarr = []; // 存储每一步NN模型前向的输出 多行3列，用作计算cost
+  // 初始化 W,b
   for (let i = 1; i < len_layerList; i++) {
     // 层数从 0开始计数，L0, L1, L2。
     W[i] = math.random([layerList[i - 1], layerList[i]], -1, 1);
@@ -1091,9 +1166,9 @@ NN.prototype.calcOneCost = function(AL, Y) {
 // ========================================================================
 // es5写法：导出一个模块对象。 是一个json对象。
 // 在其他文件使用时，也是import进了json对象
-// module.exports = {
-// ML: ML
-// };
+module.exports = {
+  ML: ML
+};
 
 // es6
-export default ML;
+// export default ML;
